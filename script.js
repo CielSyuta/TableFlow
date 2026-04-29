@@ -5265,4 +5265,29 @@ if ("serviceWorker" in navigator && ["http:", "https:"].includes(window.location
       .then(() => console.log("Service Worker Registered"))
       .catch(err => console.log("SW Error", err));
   });
+  function applyStorePreset(presetName) {
+  const preset = STORE_PRESETS[presetName];
+  if (!preset) {
+    toast(`Preset "${presetName}" not found.`, "danger");
+    return;
+  }
+
+  // Apply restaurant info
+  state.layoutConfig.restaurantName = preset.restaurantName;
+  state.layoutConfig.storeNumber = preset.storeNumber;
+
+  // Apply theme
+  Object.assign(state.settings, preset.settings);
+
+  // Apply layouts
+  if (preset.layouts && preset.layouts.length > 0) {
+    state.layoutConfig.objects = preset.layouts[0].objects;
+  }
+
+  // Persist to localStorage
+  saveState();
+  
+  // Re-render UI
+  render();
+  toast(`Applied "${presetName}" preset.`, "success");
 }
