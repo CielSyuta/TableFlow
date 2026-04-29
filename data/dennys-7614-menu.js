@@ -4536,13 +4536,17 @@
                       "subcategory":  "Beverages",
                       "price":  null,
                       "modifiers":  [
+                                        "Water",
                                         "Coca-Cola®",
                                         "Diet Coke®",
                                         "Sprite®",
                                         "Dr Pepper®",
                                         "Barq\u0027s® Root Beer",
                                         "FUZE® Raspberry Tea",
-                                        "Coca-Cola® Zero Sugar"
+                                        "Hi-Ci",
+                                        "Coca-Cola® Zero Sugar",
+                                        "Lemonade",
+                                        "STRW Lemonade"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
