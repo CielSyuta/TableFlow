@@ -7,6 +7,7 @@
   <title>TableFlow</title>
 
   <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:," />
 
   <!-- PWA / Installable App -->
   <link rel="manifest" href="manifest.json">
@@ -22,14 +23,14 @@
   <meta name="format-detection" content="telephone=no">
 
   <!-- Optional -->
-  <meta name="description" content="TableFlow Restaurant Server Assistant">
+  <meta name="description" content="TableFlow Denny's Store Assistant">
 </head>
 
 <body>
 
   <div class="loading-screen" id="loadingScreen">
     <div class="loading-card">
-      <div class="brand-icon">TF</div>
+      <div class="brand-icon" id="loadingBrandLogo">TF</div>
       <h1>TableFlow</h1>
       <p id="loadingMessage">Loading your floor plan...</p>
       <div class="loader-bar"><span></span></div>
@@ -43,7 +44,7 @@
       </div>
 
       <h1 id="authAppName">TableFlow</h1>
-      <p id="authSubtitle">Local-first restaurant server assistant.</p>
+      <p id="authSubtitle">Local-first Denny's store assistant.</p>
 
       <div id="authPanel"></div>
     </div>
@@ -89,7 +90,7 @@
 
         <div>
           <h1 id="shellAppName">TableFlow</h1>
-          <p id="shellRestaurantName">Local Server Assistant</p>
+          <p id="shellRestaurantName">Denny's Store Assistant</p>
         </div>
       </div>
 
@@ -100,12 +101,12 @@
         <button class="nav-item" data-view="menueditor" type="button">Menu Editor</button>
         <button class="nav-item" data-view="orders" type="button">Orders</button>
         <button class="nav-item" data-view="pos" type="button">POS Queue</button>
-        <button class="nav-item" data-view="stations" type="button">Stations</button>
+        <button class="nav-item" data-view="stations" type="button">Window</button>
         <button class="nav-item" data-view="sidework" type="button">Side Work</button>
         <button class="nav-item" data-view="messages" type="button">Messages</button>
         <button class="nav-item" data-view="analytics" type="button">Analytics</button>
         <button class="nav-item" data-view="gm" type="button">General Manager</button>
-        <button class="nav-item" data-view="profile" type="button">User Profile</button>
+        <button class="nav-item" data-view="profile" type="button">Profile</button>
         <button class="nav-item" data-view="settings" type="button">Settings</button>
       </nav>
       <div class="station-card">
@@ -123,12 +124,13 @@
         </div>
         <div class="topbar-actions">
           <span id="currentTime">--:--</span>
+          <button class="icon-btn" id="lockAppButton" type="button">Lock</button>
           <button class="icon-btn" id="editModeButton" type="button">Floor Editing</button>
-          <button class="icon-btn alert-button" id="alertsButton" type="button">Alerts <span id="alertCount">0</span></button>
-          <button class="icon-btn" id="messagesTopButton" type="button">Messages</button>
-          <button class="icon-btn" data-view="profile" type="button">Profile</button>
         </div>
       </header>
+      <button class="notification-bubble hidden" id="alertsButton" type="button" aria-label="Open service notifications">
+        <span id="alertCount">0</span>
+      </button>
 
       <div class="recovery-banner hidden" id="recoveryBanner"></div>
 
@@ -144,15 +146,16 @@
 
           <section class="view-panel" id="floorView" data-panel="floor">
             <div class="service-toolbar">
-              <button class="primary" id="quickSeatButton" type="button">Seat Party</button>
+              <button class="primary" id="quickSeatButton" type="button">Seat Table</button>
               <button class="primary" id="startTableButton" type="button">Start Table</button>
               <button id="openMenuButton" type="button">Open Menu</button>
               <button id="sendDrinksButton" type="button">Send Drink Round</button>
               <button id="guestCheckTopButton" type="button">Guest Check</button>
               <button id="openFloorEditorButton" type="button">Floor Editing</button>
             </div>
+            <div class="floor-overview" id="floorOverview"></div>
             <div class="mobile-floor-list" id="mobileFloorList"></div>
-            <section class="floor-plan" id="floorPlan" aria-label="Restaurant floor plan">
+            <section class="floor-plan" id="floorPlan" aria-label="Denny's floor layout">
               <div class="floor-canvas" id="floorCanvas"></div>
             </section>
           </section>
@@ -275,10 +278,9 @@
 
           <section class="view-panel" id="stationsView" data-panel="stations">
             <div class="section-header">
-              <h3>Stations</h3>
-              <p>Prep alerts and server sections.</p>
+              <h3>Window</h3>
+              <p>Prep stations and server sections.</p>
             </div>
-            <div class="alert-list" id="notificationList"></div>
             <div class="cards-grid" id="stationsList"></div>
           </section>
 
@@ -356,9 +358,10 @@
           <section class="view-panel" id="settingsView" data-panel="settings">
             <div class="section-header">
               <h3>Settings</h3>
-              <p>Local-only storage, notifications, theme, backup, and import/export.</p>
+              <p>Denny's store setup, local data, account, and device preferences.</p>
             </div>
-            <div class="settings-grid">
+            <div id="settingsPanel"></div>
+            <div class="settings-grid legacy-settings hidden" aria-hidden="true">
               <div class="settings-card">
                 <h4>App Settings</h4>
                 <label class="switch-row"><input id="themeToggle" type="checkbox" /> Light mode</label>
@@ -391,9 +394,9 @@
                 <button id="logoutSettingsButton" type="button">Log Out</button>
               </div>
               <div class="settings-card">
-                <h4>Restaurant Branding</h4>
+                <h4>Store Branding</h4>
                 <div class="form-grid">
-                  <label class="field"><span>Restaurant / store name</span><input id="brandingRestaurantNameInput" /></label>
+                  <label class="field"><span>Denny's store name</span><input id="brandingRestaurantNameInput" /></label>
                   <label class="field"><span>Store number</span><input id="brandingStoreNumberInput" /></label>
                   <label class="field"><span>App display name</span><input id="brandingAppNameInput" /></label>
                   <label class="field"><span>Primary color</span><input id="brandingPrimaryInput" type="color" /></label>
@@ -468,7 +471,7 @@
                 <div class="button-row">
                   <button class="primary" id="exportAllButton" type="button">Export All Data</button>
                   <button id="importAllButton" type="button">Import All Data</button>
-                  <button id="exportRestaurantButton" type="button">Export Restaurant Data</button>
+                  <button id="exportRestaurantButton" type="button">Export Store Data</button>
                   <button id="exportBrandingButton" type="button">Export Branding</button>
                   <button id="importBrandingButton" type="button">Import Branding</button>
                   <input id="importAllInput" type="file" accept=".json,application/json" hidden />
@@ -501,15 +504,15 @@
           <section class="view-panel" id="gmView" data-panel="gm">
             <div class="section-header">
               <h3>General Manager</h3>
-              <p>Setup tools for restaurant configuration. This page stays separate from active service.</p>
+              <p>Setup tools for Denny's store configuration. This page stays separate from active service.</p>
             </div>
             <div id="gmPanel"></div>
           </section>
 
           <section class="view-panel" id="profileView" data-panel="profile">
             <div class="section-header">
-              <h3>User Profile</h3>
-              <p>Mock local shift login. No backend or real authentication.</p>
+              <h3>Profile</h3>
+              <p>Employee shift status, assigned tables, and quick actions.</p>
             </div>
             <div id="profilePanel"></div>
           </section>
@@ -526,6 +529,7 @@
     <button data-view="orders" type="button">Orders</button>
     <button data-view="sidework" type="button">Side Work</button>
     <button data-view="messages" type="button">Messages</button>
+    <button data-view="profile" type="button">Profile</button>
     <button data-view="gm" type="button">GM</button>
     <button data-view="settings" type="button">Settings</button>
   </nav>
@@ -547,9 +551,13 @@
       <button class="nav-item" data-view="floor" type="button">Floor</button>
       <button class="nav-item" data-view="pos" type="button">POS Queue</button>
       <button class="nav-item" data-view="orders" type="button">Orders</button>
+      <button class="nav-item" data-view="stations" type="button">Window</button>
       <button class="nav-item" data-view="sidework" type="button">Side Work</button>
       <button class="nav-item" data-view="messages" type="button">Messages</button>
       <button class="nav-item" data-view="gm" type="button">General Manager</button>
+      <button class="nav-item" data-view="flooreditor" type="button">Floor Editor</button>
+      <button class="nav-item" data-view="menueditor" type="button">Menu Editor</button>
+      <button class="nav-item" data-view="developer" type="button">Developer Tools</button>
       <button class="nav-item" data-view="settings" type="button">Settings</button>
       <button class="nav-item" data-view="profile" type="button">Profile</button>
     </nav>

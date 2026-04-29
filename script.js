@@ -5,25 +5,35 @@
 const APP_VERSION = "0.3.0";
 const STORAGE_KEYS = {
   users: "tableflow.users",
-  activeSession: "tableflow.activeSession",
+  activeSession: "tableflow.session",
   restaurants: "tableflow.restaurants",
+  activeStore: "tableflow.activeStore",
   currentShift: "tableflow.currentShift",
+  currentShiftId: "tableflow.currentShiftId",
   layoutConfig: "tableflow.layoutConfig",
   menuConfig: "tableflow.menuConfig",
   settings: "tableflow.settings",
+  theme: "tableflow.theme",
+  storageVersion: "tableflow.storageVersion",
   analytics: "tableflow.analytics",
   profile: "tableflow.profile",
   messages: "tableflow.messages",
   backup: "tableflow.backup"
 };
 const USER_DATA_PREFIX = "tableflow.userData.";
+const IDB_NAME = "TableFlowDenny";
+const IDB_VERSION = 1;
+const IDB_STORES = ["users", "shifts", "activeTables", "orders", "posQueue", "alerts", "messages", "analyticsEvents", "shiftSummaries", "layoutOverrides", "menuOverrides", "restaurants", "activityFeed", "logoAssets"];
+let idbReady = null;
+let storageWarningShownAt = 0;
 
 const THEME_PRESETS = {
   default: { name: "Default TableFlow", primary: "#ff6a21", secondary: "#1d67a8", accent: "#ffc59f", bg: "#050914", panel: "#0d172a", card: "#111d32", text: "#f5f7fb", muted: "#91a2bd" },
-  dennys: { name: "Denny's Preset", primary: "#d71920", secondary: "#f9c80e", accent: "#ff7a18", bg: "#160d0b", panel: "#261411", card: "#351c16", text: "#fff8e6", muted: "#e8c98e" },
-  sakura: { name: "Sakura Preset", primary: "#d96b8a", secondary: "#8b5e3c", accent: "#f4b6c8", bg: "#fff7f2", panel: "#fffaf5", card: "#f7e8dc", text: "#39251f", muted: "#7b6256" },
+  dennys: { name: "Denny's", primary: "#d71920", secondary: "#f9c80e", accent: "#ff7a18", bg: "#170d09", panel: "#29150f", card: "#3a1f15", text: "#fff7e7", muted: "#f0c878" },
+  sakura: { name: "Sakura", primary: "#e94c91", secondary: "#ff8fc7", accent: "#ffd1e5", bg: "#fff4f9", panel: "#fff9fc", card: "#ffe7f2", text: "#3b2030", muted: "#875169" },
   blue: { name: "Blue Preset", primary: "#1683ff", secondary: "#0d47a1", accent: "#6ec6ff", bg: "#06111f", panel: "#0b1d33", card: "#102945", text: "#f3f8ff", muted: "#9cb4d1" },
-  crimson: { name: "Crimson Red Preset", primary: "#c1121f", secondary: "#2b2d31", accent: "#ff6b6b", bg: "#111113", panel: "#1d1d21", card: "#292a2f", text: "#f7f7f7", muted: "#b7b7bd" }
+  crimson: { name: "Crimson Red", primary: "#c1121f", secondary: "#2b2d31", accent: "#ff6b6b", bg: "#111113", panel: "#1d1d21", card: "#292a2f", text: "#f7f7f7", muted: "#b7b7bd" },
+  iosGlass: { name: "iOS Glass", primary: "#0a84ff", secondary: "#64d2ff", accent: "#ff9f0a", bg: "#0b1020", panel: "rgba(255,255,255,.11)", card: "rgba(255,255,255,.14)", text: "#f7fbff", muted: "#b8c7dc" }
 };
 
 const STATUS = [
@@ -47,17 +57,17 @@ const POS_CATEGORIES = window.TableFlowMenuConfig.categories;
 const GRID = 20;
 const DEV_OWNER_EMAIL = "admin@tableflow.com";
 const DEV_OWNER_PASSWORD = "1234";
-const SERVICE_NAV_VIEWS = ["home", "floor", "pos", "orders", "sidework", "messages", "settings", "profile"];
+const SERVICE_NAV_VIEWS = ["home", "floor", "orders", "pos", "stations", "sidework", "messages", "profile", "settings"];
 const GM_ROLES = ["General Manager"];
 const MANAGER_ROLES = ["General Manager", "Manager"];
 const ROLE_HOME_VIEWS = {
-  "General Manager": ["home", "floor", "menu", "pos", "orders", "sidework", "messages", "analytics", "gm", "settings", "profile", "stations"],
-  Manager: ["home", "floor", "menu", "pos", "orders", "sidework", "messages", "analytics", "settings", "profile", "stations"],
-  Supervisor: ["home", "floor", "menu", "pos", "orders", "sidework", "messages", "analytics", "settings", "profile", "stations"],
-  PIC: ["home", "floor", "menu", "pos", "orders", "sidework", "messages", "settings", "profile", "stations"],
-  Server: ["home", "floor", "menu", "pos", "orders", "sidework", "messages", "settings", "profile"],
-  Host: ["home", "floor", "menu", "messages", "settings", "profile"],
-  Dishwasher: ["home", "sidework", "messages", "settings", "profile"]
+  "General Manager": ["home", "floor", "menu", "pos", "orders", "stations", "sidework", "messages", "analytics", "gm", "settings", "profile"],
+  Manager: ["home", "floor", "menu", "pos", "orders", "stations", "sidework", "messages", "analytics", "settings", "profile"],
+  Supervisor: ["home", "floor", "menu", "pos", "orders", "stations", "sidework", "messages", "analytics", "settings", "profile"],
+  PIC: ["home", "floor", "menu", "pos", "orders", "stations", "sidework", "messages", "settings", "profile"],
+  Server: ["home", "floor", "menu", "pos", "orders", "stations", "sidework", "messages", "settings", "profile"],
+  Host: ["home", "floor", "stations", "messages", "settings", "profile"],
+  Dishwasher: ["home", "stations", "sidework", "messages", "settings", "profile"]
 };
 
 const els = {};
@@ -102,6 +112,11 @@ const state = {
   menuBuilder: null,
   mobileNavOpen: false,
   notificationCooldowns: {}
+  , settingsPage: "main",
+  storage: { idbAvailable: false, fallback: false, usageBytes: 0 },
+  syncTimer: null,
+  syncInFlight: false,
+  syncQueued: false
 };
 
 document.addEventListener("DOMContentLoaded", boot);
@@ -109,10 +124,11 @@ document.addEventListener("DOMContentLoaded", boot);
 function boot() {
   cacheElements();
   showLoading("Loading your floor plan...");
-  window.setTimeout(() => {
+  window.setTimeout(async () => {
     try {
+      await initLocalDatabase();
       loadAuthState();
-      loadStateSafely();
+      await loadStateSafely();
       bindEvents();
       setTheme(state.settings.theme);
       applyBranding();
@@ -133,6 +149,8 @@ function boot() {
       }
       setInterval(updateTime, 30000);
       setInterval(runReminderTick, 30000);
+      setupCloudSyncTimer();
+      queueCloudSync("startup");
     } catch (error) {
       console.error("TableFlow startup failed", error);
       window.TableFlowTroubleshooter?.handleFatal?.(error);
@@ -143,11 +161,11 @@ function boot() {
 function cacheElements() {
   [
     "authScreen", "authPanel", "authAppName", "authSubtitle", "authBrandLogo",
-    "loadingScreen", "loadingMessage", "appShell", "floorCanvas", "floorPlan", "detailPanel",
+    "loadingScreen", "loadingMessage", "loadingBrandLogo", "appShell", "floorCanvas", "floorPlan", "detailPanel",
     "shellBrandLogo", "shellAppName", "shellRestaurantName",
     "lockScreen", "lockMessage", "pinEntryInput", "pinKeypad", "unlockButton", "clearLocalDataButton",
-    "storageStatus", "settingsStorageStatus", "currentTime", "viewTitle", "viewSubtitle",
-    "editModeButton", "alertsButton", "alertCount", "messagesTopButton", "snapToggle", "gridToggle", "quickSeatButton",
+    "storageStatus", "settingsStorageStatus", "currentTime", "viewTitle", "viewSubtitle", "settingsPanel", "lockAppButton",
+    "editModeButton", "alertsButton", "alertCount", "messagesTopButton", "snapToggle", "gridToggle", "quickSeatButton", "floorOverview",
     "openMenuButton", "sendDrinksButton", "guestCheckTopButton", "openFloorEditorButton",
     "backToFloorButton", "saveLayoutButton", "undoLayoutButton", "redoLayoutButton",
     "zoomOutButton", "resetZoomButton", "zoomInButton", "exportLayoutButton", "importLayoutButton",
@@ -156,7 +174,7 @@ function cacheElements() {
     "menuSeatButtons", "expandedOrderPanel", "homePanel", "tableDashboardPanel", "startTableButton",
     "mobileFloorList", "messagesPanel", "gmPanel", "mobileNavToggle", "mobileNavBackdrop", "mobileNavDrawer",
     "categoryTabs", "menuGrid", "noDrinkButton", "ordersList", "posQueueList",
-    "copyPosQueueButton", "notificationList", "stationsList", "analyticsCards",
+    "copyPosQueueButton", "stationsList", "analyticsCards",
     "analyticsBars", "themeToggle", "notificationsToggle", "chimeToggle", "autosaveToggle",
     "chimeVolume", "testChimeButton", "testNotificationButton", "appVersionText", "saveNowButton",
     "inAppAlertsToggle", "pushNotificationsToggle", "voiceNotificationsToggle", "voiceModeInput",
@@ -219,18 +237,94 @@ function fadeInAuth() {
 }
 
 // Storage
-function loadStateSafely() {
+function initLocalDatabase() {
+  if (!("indexedDB" in window)) {
+    state.storage.idbAvailable = false;
+    state.storage.fallback = true;
+    return Promise.resolve(null);
+  }
+  idbReady = new Promise((resolve) => {
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      IDB_STORES.forEach((store) => {
+        if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath: "id" });
+      });
+    };
+    request.onsuccess = () => {
+      state.storage.idbAvailable = true;
+      state.storage.fallback = false;
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      state.storage.idbAvailable = false;
+      state.storage.fallback = true;
+      resolve(null);
+    };
+  });
+  return idbReady;
+}
+
+async function idbPut(store, value) {
+  const db = await idbReady;
+  if (!db || !value?.id || !db.objectStoreNames.contains(store)) return false;
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
+  });
+}
+
+async function idbGet(store, id) {
+  const db = await idbReady;
+  if (!db || !db.objectStoreNames.contains(store)) return null;
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, "readonly");
+    const request = tx.objectStore(store).get(id);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function idbGetAll(store) {
+  const db = await idbReady;
+  if (!db || !db.objectStoreNames.contains(store)) return [];
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, "readonly");
+    const request = tx.objectStore(store).getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => resolve([]);
+  });
+}
+
+async function idbClear(store) {
+  const db = await idbReady;
+  if (!db || !db.objectStoreNames.contains(store)) return false;
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).clear();
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
+  });
+}
+
+async function loadStateSafely() {
   const defaults = createDefaults();
   const userData = state.activeUser ? safeRead(`${USER_DATA_PREFIX}${state.activeUser.id}`, null, false) : null;
-  const restaurantData = userData?.restaurantData || null;
+  const session = safeRead(STORAGE_KEYS.activeSession, null, false) || safeRead("tableflow.activeSession", null, false);
+  const activeStore = safeRead(STORAGE_KEYS.activeStore, null, false);
+  const idbSnapshot = session?.currentShiftId ? await idbGet("shifts", session.currentShiftId) : null;
+  const idbRestaurant = activeStore?.id ? await idbGet("restaurants", activeStore.id) : null;
+  const restaurantData = idbRestaurant?.restaurantData || userData?.restaurantData || null;
   const loaded = restaurantData ? restaurantDataToAppState(restaurantData, defaults) : {
     layoutConfig: safeRead(STORAGE_KEYS.layoutConfig, defaults.layoutConfig),
     menuConfig: safeRead(STORAGE_KEYS.menuConfig, defaults.menuConfig),
     settings: safeRead(STORAGE_KEYS.settings, defaults.settings),
-    currentShift: safeRead(STORAGE_KEYS.currentShift, defaults.currentShift),
-    analytics: safeRead(STORAGE_KEYS.analytics, defaults.analytics),
+    currentShift: idbSnapshot?.currentShift || safeRead(STORAGE_KEYS.currentShift, defaults.currentShift),
+    analytics: { events: await idbGetAll("analyticsEvents") || safeRead(STORAGE_KEYS.analytics, defaults.analytics).events || [] },
     profile: safeRead(STORAGE_KEYS.profile, defaults.profile),
-    messages: safeRead(STORAGE_KEYS.messages, defaults.messages)
+    messages: await idbGetAll("messages") || safeRead(STORAGE_KEYS.messages, defaults.messages)
   };
   state.restaurantData = restaurantData;
 
@@ -246,6 +340,11 @@ function loadStateSafely() {
   }
 
   Object.assign(state, normalizeAll(loaded, defaults));
+  const storedLogo = await idbGet("logoAssets", "store-logo");
+  if (storedLogo?.dataUrl) {
+    state.settings.branding.logoDataUrl = storedLogo.dataUrl;
+    state.settings.branding.logoKey = "store-logo";
+  }
   if (state.activeUser) {
     state.profile.loggedIn = true;
     state.profile.name = state.activeUser.name;
@@ -259,7 +358,7 @@ function loadAuthState() {
   state.users = safeRead(STORAGE_KEYS.users, [], false) || [];
   ensureDeveloperOwnerAccount();
   state.restaurants = safeRead(STORAGE_KEYS.restaurants, [], false) || [];
-  const session = safeRead(STORAGE_KEYS.activeSession, null, false);
+  const session = safeRead(STORAGE_KEYS.activeSession, null, false) || safeRead("tableflow.activeSession", null, false);
   state.activeUser = session?.userId ? state.users.find((user) => user.id === session.userId) || null : null;
 }
 
@@ -306,33 +405,245 @@ function safeWrite(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (error) {
-    toast("Storage is full or unavailable. Export your data soon.", "danger");
+    const now = Date.now();
+    if (now - storageWarningShownAt > 120000) {
+      storageWarningShownAt = now;
+      toast("Device storage is almost full. Open Settings > Data & Storage for cleanup.", "danger");
+    }
     return false;
   }
 }
 
 function saveAll(markClean = true) {
   if (!state.settings.autosave && markClean !== true) return;
-  safeWrite(STORAGE_KEYS.backup, exportAllDataObject());
-  safeWrite(STORAGE_KEYS.layoutConfig, state.layoutConfig);
-  safeWrite(STORAGE_KEYS.menuConfig, state.menuConfig);
-  safeWrite(STORAGE_KEYS.settings, state.settings);
-  safeWrite(STORAGE_KEYS.currentShift, state.currentShift);
-  safeWrite(STORAGE_KEYS.analytics, state.analytics);
-  safeWrite(STORAGE_KEYS.profile, state.profile);
-  safeWrite(STORAGE_KEYS.messages, state.messages);
-  safeWrite(STORAGE_KEYS.restaurants, state.restaurants);
+  persistLargeData();
+  safeWrite(STORAGE_KEYS.settings, compactSettingsForLocalStorage());
+  safeWrite(STORAGE_KEYS.theme, { mode: state.settings.theme, preset: state.settings.branding?.preset || "dennys" });
+  safeWrite(STORAGE_KEYS.storageVersion, { version: APP_VERSION, schema: IDB_VERSION, updatedAt: Date.now() });
+  safeWrite(STORAGE_KEYS.profile, compactProfileForLocalStorage());
+  safeWrite(STORAGE_KEYS.activeStore, state.restaurantData ? { id: state.restaurantData.id, name: state.restaurantData.restaurantName, storeNumber: state.restaurantData.storeNumber || "" } : null);
   if (state.activeUser) {
     state.restaurantData = buildRestaurantData();
-    safeWrite(`${USER_DATA_PREFIX}${state.activeUser.id}`, { userId: state.activeUser.id, restaurantData: state.restaurantData, updatedAt: Date.now() });
-    safeWrite(`tableflow.restaurantData.${state.restaurantData.id}`, state.restaurantData);
+    safeWrite(STORAGE_KEYS.activeSession, { userId: state.activeUser.id, restaurantId: state.restaurantData.id, currentShiftId: state.currentShift.id, signedInAt: Date.now() });
   }
   if (markClean) state.dirty = false;
   updateStorageStatus();
+  queueCloudSync("save");
+}
+
+function compactSettingsForLocalStorage() {
+  const { branding = {}, developer = {}, navigation = {}, notificationSettings = {}, sideWork = {}, checkBack = {}, serviceWorkflow = {}, sync = {} } = state.settings || {};
+  const { logoDataUrl, ...brandingWithoutLogo } = branding;
+  return {
+    theme: state.settings.theme,
+    autosave: state.settings.autosave,
+    notifications: state.settings.notifications,
+    chime: state.settings.chime,
+    chimeVolume: state.settings.chimeVolume,
+    snap: state.settings.snap,
+    showGrid: state.settings.showGrid,
+    pinEnabled: state.settings.pinEnabled,
+    pinRequireOpen: state.settings.pinRequireOpen,
+    pinRequireAdmin: state.settings.pinRequireAdmin,
+    pinHash: state.settings.pinHash,
+    branding: { ...brandingWithoutLogo, logoKey: branding.logoKey || (logoDataUrl ? "store-logo" : "") },
+    developer,
+    navigation,
+    notificationSettings,
+    sideWork,
+    checkBack,
+    serviceWorkflow,
+    sync
+  };
+}
+
+function compactProfileForLocalStorage() {
+  return {
+    loggedIn: state.profile.loggedIn,
+    name: state.profile.name,
+    employeeId: state.profile.employeeId,
+    role: state.profile.role,
+    station: state.profile.station,
+    assignedTableIds: state.profile.assignedTableIds,
+    shiftStart: state.profile.shiftStart,
+    workSchedule: state.profile.workSchedule
+  };
+}
+
+function persistLargeData() {
+  if (state.storage.idbAvailable) {
+    idbPut("shifts", { id: state.currentShift.id, currentShift: state.currentShift, updatedAt: Date.now() });
+    idbPut("restaurants", { id: state.restaurantData?.id || "local-store", restaurantData: buildRestaurantData(), updatedAt: Date.now() });
+    if (state.settings.branding?.logoDataUrl) idbPut("logoAssets", { id: "store-logo", dataUrl: state.settings.branding.logoDataUrl, updatedAt: Date.now() });
+    state.messages.forEach((message) => idbPut("messages", message));
+    state.analytics.events.forEach((event) => idbPut("analyticsEvents", { id: event.id || makeId("event"), ...event }));
+  } else {
+    safeWrite(STORAGE_KEYS.currentShift, keepCurrentShiftOnly(state.currentShift));
+    safeWrite(STORAGE_KEYS.messages, state.messages.slice(0, 40));
+    safeWrite(STORAGE_KEYS.analytics, { events: state.analytics.events.slice(-150) });
+  }
+}
+
+function queueSyncChange(type, detail = {}) {
+  if (!state.currentShift?.syncState) return;
+  state.currentShift.syncState.pendingChanges = state.currentShift.syncState.pendingChanges || [];
+  state.currentShift.syncState.pendingChanges.push({
+    id: makeId("change"),
+    type,
+    detail,
+    deviceId: state.currentShift.syncState.deviceId,
+    userId: state.activeUser?.id || state.currentShift.userId || "local-user",
+    restaurantId: state.restaurantData?.id || state.currentShift.restaurantId || "local-store",
+    createdAt: Date.now()
+  });
+  state.currentShift.syncState.pendingChanges = state.currentShift.syncState.pendingChanges.slice(-100);
+}
+
+function cloudSyncConfigured() {
+  return Boolean(state.settings?.sync?.enabled && state.settings.sync.endpoint);
+}
+
+function setupCloudSyncTimer() {
+  if (state.syncTimer) window.clearInterval(state.syncTimer);
+  const seconds = Math.max(5, Number(state.settings?.sync?.intervalSeconds || 15));
+  state.syncTimer = window.setInterval(() => queueCloudSync("timer"), seconds * 1000);
+}
+
+function queueCloudSync(reason = "manual") {
+  if (!cloudSyncConfigured()) return;
+  state.syncQueued = true;
+  window.clearTimeout(state.cloudSyncDebounce);
+  state.cloudSyncDebounce = window.setTimeout(() => runCloudSync(reason), 900);
+}
+
+async function runCloudSync(reason = "manual") {
+  if (!cloudSyncConfigured() || state.syncInFlight) return;
+  state.syncInFlight = true;
+  state.syncQueued = false;
+  state.settings.sync.status = "syncing";
+  try {
+    await pullCloudSync(false);
+    await pushCloudSync(false);
+    state.settings.sync.status = "online";
+    state.settings.sync.lastSyncReason = reason;
+    state.settings.sync.lastError = "";
+  } catch (error) {
+    state.settings.sync.status = "error";
+    state.settings.sync.lastError = error.message || "Cloud sync failed.";
+    toast("Cloud sync could not reach the online store.", "danger");
+  } finally {
+    state.syncInFlight = false;
+    renderSettingsSurface();
+  }
+}
+
+function cloudSyncHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  if (state.settings.sync.apiKey) headers.Authorization = `Bearer ${state.settings.sync.apiKey}`;
+  return headers;
+}
+
+function buildCloudSyncPayload() {
+  return {
+    version: APP_VERSION,
+    syncVersion: Date.now(),
+    storeId: state.restaurantData?.id || "local-store",
+    deviceId: state.currentShift.syncState?.deviceId || "local-device",
+    updatedAt: Date.now(),
+    restaurantData: buildRestaurantData(),
+    currentShift: state.currentShift,
+    activeTables: state.currentShift.tables,
+    messages: state.messages,
+    alerts: state.currentShift.alerts,
+    analyticsEvents: state.analytics.events.slice(-500),
+    activityFeed: state.currentShift.activityFeed || []
+  };
+}
+
+async function pushCloudSync(showToast = true) {
+  if (!cloudSyncConfigured()) return false;
+  const response = await fetch(state.settings.sync.endpoint, {
+    method: state.settings.sync.method || "PUT",
+    headers: cloudSyncHeaders(),
+    body: JSON.stringify(buildCloudSyncPayload())
+  });
+  if (!response.ok) throw new Error(`Push failed (${response.status})`);
+  state.currentShift.syncState.pendingChanges = [];
+  state.currentShift.syncState.lastSync = Date.now();
+  state.settings.sync.lastPush = Date.now();
+  if (showToast) toast("Pushed service state online.");
+  return true;
+}
+
+async function pullCloudSync(showToast = true) {
+  if (!cloudSyncConfigured()) return false;
+  const response = await fetch(state.settings.sync.endpoint, { method: "GET", headers: cloudSyncHeaders() });
+  if (response.status === 404 || response.status === 204) return false;
+  if (!response.ok) throw new Error(`Pull failed (${response.status})`);
+  const payload = await response.json();
+  applyCloudSyncPayload(payload);
+  state.settings.sync.lastPull = Date.now();
+  state.currentShift.syncState.lastSync = Date.now();
+  if (showToast) toast("Pulled online service state.");
+  return true;
+}
+
+function applyCloudSyncPayload(payload) {
+  if (!payload || typeof payload !== "object") return;
+  const incomingShift = payload.currentShift || payload.shift;
+  if (incomingShift?.id && incomingShift.id !== state.currentShift.id) {
+    state.currentShift = normalizeAll({ ...state, currentShift: incomingShift }, createDefaults()).currentShift;
+  } else if (incomingShift) {
+    state.currentShift = mergeCurrentShift(state.currentShift, incomingShift);
+  } else if (payload.activeTables) {
+    state.currentShift = mergeCurrentShift(state.currentShift, { ...state.currentShift, tables: payload.activeTables });
+  }
+  if (payload.messages) state.messages = mergeByUpdatedAt(state.messages, payload.messages);
+  if (payload.analyticsEvents) state.analytics.events = mergeByUpdatedAt(state.analytics.events, payload.analyticsEvents).slice(-800);
+  if (payload.restaurantData && !state.restaurantData) state.restaurantData = payload.restaurantData;
+}
+
+function mergeCurrentShift(localShift, remoteShift) {
+  const merged = { ...localShift, ...remoteShift };
+  merged.tables = { ...(localShift.tables || {}) };
+  Object.entries(remoteShift.tables || {}).forEach(([tableId, remoteTable]) => {
+    const localTable = merged.tables[tableId] || {};
+    const localTime = Number(localTable.updatedAt || localTable.timestamps?.seated || 0);
+    const remoteTime = Number(remoteTable.updatedAt || remoteTable.timestamps?.seated || 0);
+    merged.tables[tableId] = remoteTime >= localTime ? { ...localTable, ...remoteTable } : localTable;
+  });
+  merged.alerts = mergeByUpdatedAt(localShift.alerts || [], remoteShift.alerts || []);
+  merged.seatingRecords = mergeByUpdatedAt(localShift.seatingRecords || [], remoteShift.seatingRecords || []);
+  merged.shiftSummaries = mergeByUpdatedAt(localShift.shiftSummaries || [], remoteShift.shiftSummaries || []);
+  merged.activityFeed = mergeByUpdatedAt(localShift.activityFeed || [], remoteShift.activityFeed || []);
+  merged.syncState = { ...(localShift.syncState || {}), ...(remoteShift.syncState || {}), pendingChanges: localShift.syncState?.pendingChanges || [] };
+  return merged;
+}
+
+function mergeByUpdatedAt(localList = [], remoteList = []) {
+  const map = new Map();
+  [...localList, ...remoteList].forEach((item) => {
+    if (!item) return;
+    const id = item.id || `${item.type || "item"}-${item.createdAt || item.timestamp || Math.random()}`;
+    const existing = map.get(id);
+    const nextTime = Number(item.updatedAt || item.createdAt || item.timestamp || 0);
+    const existingTime = Number(existing?.updatedAt || existing?.createdAt || existing?.timestamp || 0);
+    if (!existing || nextTime >= existingTime) map.set(id, { ...item, id });
+  });
+  return Array.from(map.values()).sort((a, b) => Number(b.updatedAt || b.createdAt || b.timestamp || 0) - Number(a.updatedAt || a.createdAt || a.timestamp || 0));
+}
+
+function keepCurrentShiftOnly(shift) {
+  return {
+    ...shift,
+    alerts: (shift.alerts || []).slice(0, 80),
+    tables: Object.fromEntries(Object.entries(shift.tables || {}).filter(([, table]) => table.partySize || table.orders?.length || table.posQueue?.length))
+  };
 }
 
 function markDirty() {
   state.dirty = true;
+  queueSyncChange("state_changed");
   if (state.settings.autosave) saveAll(true);
 }
 
@@ -345,7 +656,7 @@ window.addEventListener("beforeunload", (event) => {
 
 function createDefaults() {
   const layoutConfig = {
-    restaurantName: "TableFlow Demo",
+    restaurantName: "Denny's Store Default",
     objects: [
       obj("table-1", "Table 1", "table", 70, 60, 130, 82, "booth-4", 4, "server-1"),
       obj("table-2", "Table 2", "table", 230, 60, 130, 82, "booth-4", 4, "server-1"),
@@ -383,7 +694,19 @@ function createDefaults() {
       taskInstances: [],
       scheduleSettings: {},
       reminderSettings: {}
-    }
+    },
+    shiftSummaries: [],
+    seatingRecords: [],
+    activityFeed: [],
+    syncState: { pendingChanges: [], lastSync: null, deviceId: makeId("device"), userId: null, restaurantId: null },
+    isClockedIn: false,
+    clockInAt: null,
+    clockOutAt: null,
+    assignedTableIds: [],
+    role: "Server",
+    sectionId: "server-1",
+    tipsEarned: 0,
+    notes: ""
   };
   return {
     layoutConfig,
@@ -411,6 +734,7 @@ function createDefaults() {
       sideWork: { remindersEnabled: true, chimeEnabled: true, reminderStyle: "gentle", snoozeDefaultMinutes: 15, maxFocusTasks: 3 },
       checkBack: { enabled: true, firstCheckMinutes: 2, refillCheckMinutes: 8, secondCheckMinutes: 15, dessertSuggestMinutes: 25, useSmartTiming: true, chimeEnabled: true, pulseTable: true },
       serviceWorkflow: { quickDrinkDelivery: true, skipDrinkDeliveryConfirm: false, orderReminderAfterDrinks: true, orderReminderAfterDrinksMinutes: 4 },
+      sync: { enabled: false, endpoint: "", apiKey: "", intervalSeconds: 15, lastPush: null, lastPull: null, lastError: "", status: "offline" },
       developer: { enabled: false, showTesterToggle: false, debugLogs: false, preview: "full" },
       navigation: { compact: false }
     },
@@ -444,7 +768,7 @@ function createDefaults() {
 
 function defaultBranding() {
   return {
-    restaurantName: "TableFlow Demo Restaurant",
+      restaurantName: "Denny's Store",
     storeNumber: "",
     appDisplayName: "TableFlow",
     logoDataUrl: "",
@@ -456,7 +780,9 @@ function defaultBranding() {
     buttonStyle: "rounded",
     useLogoOnGuestCheck: true,
     useLogoOnLogin: true,
-    preset: "default"
+      preset: "dennys",
+      logoKey: "dennys-repo-logo",
+      logoAssetPath: "data/dennys_logo.png"
   };
 }
 
@@ -511,6 +837,7 @@ function normalizeAll(data, defaults) {
     serviceWorkflow: { ...defaults.settings.serviceWorkflow, ...(data.settings?.serviceWorkflow || {}) },
     developer: { ...defaults.settings.developer, ...(data.settings?.developer || {}) },
     notificationSettings: { ...defaults.settings.notificationSettings, ...(data.settings?.notificationSettings || {}) },
+    sync: { ...defaults.settings.sync, ...(data.settings?.sync || {}) },
     navigation: { ...defaults.settings.navigation, ...(data.settings?.navigation || {}) }
   };
   const profile = {
@@ -526,6 +853,14 @@ function normalizeAll(data, defaults) {
     currentShift.tables[table.id] = normalizeTableState(currentShift.tables[table.id], table);
   });
   currentShift.alerts = Array.isArray(currentShift.alerts) ? currentShift.alerts : [];
+  currentShift.shiftSummaries = Array.isArray(currentShift.shiftSummaries) ? currentShift.shiftSummaries : [];
+  currentShift.seatingRecords = Array.isArray(currentShift.seatingRecords) ? currentShift.seatingRecords : [];
+  currentShift.activityFeed = Array.isArray(currentShift.activityFeed) ? currentShift.activityFeed : [];
+  currentShift.syncState = currentShift.syncState || { pendingChanges: [], lastSync: null, deviceId: makeId("device"), userId: state.activeUser?.id || null, restaurantId: state.restaurantData?.id || null };
+  currentShift.isClockedIn = Boolean(currentShift.isClockedIn);
+  currentShift.assignedTableIds = Array.isArray(currentShift.assignedTableIds) ? currentShift.assignedTableIds : [];
+  currentShift.role = currentShift.role || profile.role || "Server";
+  currentShift.sectionId = currentShift.sectionId || profile.workSchedule?.defaultStationId || "server-1";
   currentShift.sideWork = normalizeSideWork(currentShift.sideWork, defaults.currentShift.sideWork);
   ensureSideWorkInstances(currentShift.sideWork, profile.workSchedule || defaults.profile.workSchedule);
   const analytics = { events: Array.isArray(data.analytics?.events) ? data.analytics.events : [] };
@@ -797,7 +1132,7 @@ function renderAuth() {
   const panels = {
     welcome: `
       <h2>Welcome</h2>
-      <p>Run a restaurant floor, menu, POS queue, side work, and shift data on this device.</p>
+      <p>Run a Denny's floor, menu, POS queue, side work, and shift data on this device.</p>
       <div class="button-row auth-actions">
         <button class="primary" data-auth-mode="signin" type="button">Sign In</button>
         <button data-auth-mode="signup" type="button">Sign Up</button>
@@ -811,13 +1146,15 @@ function renderAuth() {
       <div class="button-row auth-actions"><button data-auth-mode="forgot" type="button">Forgot Password</button><button data-auth-mode="signup" type="button">Create Account</button></div>
     `,
     signup: `
-      <h2>Sign Up</h2>
+      <h2>Create Account</h2>
       <label class="field"><span>Full Name</span><input id="signupNameInput" /></label>
+      <label class="field"><span>Username</span><input id="signupUsernameInput" /></label>
       <label class="field"><span>Email</span><input id="signupEmailInput" type="email" /></label>
       <label class="field"><span>Password</span><input id="signupPasswordInput" type="password" /></label>
       <label class="field"><span>Confirm Password</span><input id="signupConfirmPasswordInput" type="password" /></label>
       <label class="field"><span>Position / Role</span><select id="signupRoleInput">${getRoleOptions("Server")}</select></label>
       <label class="field"><span>Employee ID optional</span><input id="signupEmployeeIdInput" /></label>
+      <label class="field"><span>Profile picture optional</span><input id="signupProfileImageInput" type="file" accept="image/*" /></label>
       <button class="primary" id="signupButton" type="button">Create Account</button>
       <button data-auth-mode="signin" type="button">I already have an account</button>
     `,
@@ -835,14 +1172,24 @@ function renderAuth() {
       <button data-auth-mode="signin" type="button">Back to Sign In</button>
     `,
     restaurant: `
-      <h2>Create Restaurant</h2>
-      <p>This creates a local workspace for this account. Cloud sync can plug into this data later.</p>
-      <label class="field"><span>Restaurant / store name</span><input id="createRestaurantNameInput" value="TableFlow Demo Restaurant" /></label>
+      <h2>Denny's Store Setup</h2>
+      <p>Create or join a local Denny's store team workspace. Cloud sync can plug into this data later.</p>
+      <div class="button-row auth-actions"><button class="primary" data-auth-mode="createStore" type="button">Create Store</button><button data-auth-mode="joinStore" type="button">Join Store</button></div>
+    `,
+    createStore: `
+      <h2>Create Store</h2>
+      <label class="field"><span>Denny's store name</span><input id="createRestaurantNameInput" value="Denny's Store" /></label>
       <label class="field"><span>Store number</span><input id="createStoreNumberInput" /></label>
       <label class="field"><span>Address optional</span><input id="createRestaurantAddressInput" /></label>
-      <label class="field"><span>Brand preset</span><select id="createRestaurantPresetInput">${Object.entries(THEME_PRESETS).map(([key, preset]) => `<option value="${key}">${escapeHtml(preset.name)}</option>`).join("")}</select></label>
-      <button class="primary" id="createRestaurantButton" type="button">Create Restaurant</button>
-      <button id="joinRestaurantButton" type="button">Join Restaurant Placeholder</button>
+      <label class="field"><span>Brand preset</span><select id="createRestaurantPresetInput">${Object.entries(THEME_PRESETS).map(([key, preset]) => `<option value="${key}" ${key === "dennys" ? "selected" : ""}>${escapeHtml(preset.name)}</option>`).join("")}</select></label>
+      <button class="primary" id="createRestaurantButton" type="button">Create Store</button>
+      <button data-auth-mode="restaurant" type="button">Back</button>
+    `,
+    joinStore: `
+      <h2>Join Store</h2>
+      <label class="field"><span>Invite code</span><input id="joinInviteCodeInput" placeholder="TF-DENNYS-2048" /></label>
+      <button class="primary" id="joinStoreButton" type="button">Request Access</button>
+      <button data-auth-mode="restaurant" type="button">Back</button>
     `
   };
   els.authPanel.innerHTML = panels[mode] || panels.welcome;
@@ -853,7 +1200,7 @@ function renderAuth() {
   document.getElementById("sendResetButton")?.addEventListener("click", startPasswordReset);
   document.getElementById("resetPasswordButton")?.addEventListener("click", finishPasswordReset);
   document.getElementById("createRestaurantButton")?.addEventListener("click", createRestaurantWorkspace);
-  document.getElementById("joinRestaurantButton")?.addEventListener("click", () => toast("Join Restaurant will connect to cloud invites later."));
+  document.getElementById("joinStoreButton")?.addEventListener("click", joinStoreWorkspace);
 }
 
 function getRoleOptions(selected = "Server") {
@@ -864,14 +1211,15 @@ function getRoleOptions(selected = "Server") {
 
 function signUpLocal() {
   const name = document.getElementById("signupNameInput").value.trim();
+  const username = document.getElementById("signupUsernameInput").value.trim();
   const email = document.getElementById("signupEmailInput").value.trim().toLowerCase();
   const password = document.getElementById("signupPasswordInput").value;
   const confirmPassword = document.getElementById("signupConfirmPasswordInput").value;
   const employeeId = document.getElementById("signupEmployeeIdInput").value.trim();
-  if (!name || !email || password.length < 4) return toast("Enter name, email, and a 4+ character password.", "danger");
+  if (!name || !username || !email || password.length < 4) return toast("Enter name, username, email, and a 4+ character password.", "danger");
   if (password !== confirmPassword) return toast("Passwords do not match.", "danger");
   if (state.users.some((user) => user.email === email)) return toast("That local account already exists.", "danger");
-  state.pendingVerification = { id: makeId("user"), name, email, passwordHash: hashPin(password), role: document.getElementById("signupRoleInput").value, employeeId, code: String(Math.floor(100000 + Math.random() * 900000)) };
+  state.pendingVerification = { id: makeId("user"), fullName: name, name, username, email, passwordHash: hashPin(password), role: document.getElementById("signupRoleInput").value, employeeId, profileImage: "", pinEnabled: false, restaurantId: null, preferences: {}, code: String(Math.floor(100000 + Math.random() * 900000)) };
   state.authMode = "verify";
   renderAuth();
 }
@@ -894,20 +1242,23 @@ function verifyLocalAccount() {
   renderAuth();
 }
 
-function signInLocal() {
+async function signInLocal() {
   const email = document.getElementById("signinEmailInput").value.trim().toLowerCase();
   const password = document.getElementById("signinPasswordInput").value;
   const user = state.users.find((entry) => entry.email === email && entry.passwordHash === hashPin(password));
   if (!user) return toast("Sign in failed. Check the local email and password.", "danger");
   startSession(user);
-  loadStateSafely();
+  await loadStateSafely();
   if (state.restaurantData) fadeInApp();
   else { state.authMode = "restaurant"; renderAuth(); }
 }
 
 function startSession(user) {
+  user.lastLogin = Date.now();
   state.activeUser = user;
-  safeWrite(STORAGE_KEYS.activeSession, { userId: user.id, signedInAt: Date.now() });
+  state.users = state.users.map((entry) => entry.id === user.id ? { ...entry, lastLogin: user.lastLogin } : entry);
+  safeWrite(STORAGE_KEYS.users, state.users);
+  safeWrite(STORAGE_KEYS.activeSession, { userId: user.id, restaurantId: user.restaurantId || state.restaurantData?.id || null, currentShiftId: state.currentShift?.id || null, signedInAt: Date.now() });
 }
 
 function startPasswordReset() {
@@ -931,7 +1282,7 @@ function finishPasswordReset() {
 }
 
 function createRestaurantWorkspace() {
-  const name = document.getElementById("createRestaurantNameInput").value.trim() || "TableFlow Restaurant";
+  const name = document.getElementById("createRestaurantNameInput").value.trim() || "Denny's Store";
   const storeNumber = document.getElementById("createStoreNumberInput").value.trim();
   const address = document.getElementById("createRestaurantAddressInput")?.value.trim() || "";
   const preset = document.getElementById("createRestaurantPresetInput")?.value || "default";
@@ -946,6 +1297,11 @@ function createRestaurantWorkspace() {
   state.settings.branding.storeNumber = storeNumber;
   state.settings.branding.address = address;
   state.restaurantData = buildRestaurantData();
+  if (state.activeUser) {
+    state.activeUser.restaurantId = state.restaurantData.id;
+    state.users = state.users.map((user) => user.id === state.activeUser.id ? { ...user, restaurantId: state.restaurantData.id, updatedAt: Date.now() } : user);
+    safeWrite(STORAGE_KEYS.users, state.users);
+  }
   state.restaurants = upsertById(state.restaurants, {
     id: state.restaurantData.id,
     name,
@@ -954,13 +1310,45 @@ function createRestaurantWorkspace() {
     createdBy: state.activeUser?.id || "local",
     createdAt: state.restaurantData.createdAt,
     updatedAt: Date.now(),
-    theme: state.settings.branding,
-    logo: state.settings.branding.logoDataUrl || "",
-    settings: state.settings
+    inviteCode: state.restaurantData.inviteCode,
+    joiningEnabled: true,
+    requireApproval: true,
+    members: buildRestaurantMembers(),
+    settings: compactSettingsForLocalStorage()
   });
   saveAll(true);
   fadeInApp();
   setView("home");
+}
+
+function joinStoreWorkspace() {
+  const code = document.getElementById("joinInviteCodeInput").value.trim().toUpperCase();
+  const restaurant = state.restaurants.find((entry) => String(entry.inviteCode || "").toUpperCase() === code);
+  if (!code) return toast("Enter a Denny's store invite code.", "danger");
+  if (!restaurant) {
+    const pending = {
+      id: makeId("restaurant"),
+      name: "Pending Denny's Store",
+      inviteCode: code,
+      joiningEnabled: true,
+      requireApproval: true,
+      joinRequests: [{ userId: state.activeUser?.id || "local-user", requestedAt: Date.now(), status: "pending" }],
+      members: []
+    };
+    state.restaurants = upsertById(state.restaurants, pending);
+    safeWrite(STORAGE_KEYS.restaurants, state.restaurants);
+    toast("Join request saved locally for GM approval.");
+    return;
+  }
+  restaurant.joinRequests = restaurant.joinRequests || [];
+  restaurant.joinRequests.push({ userId: state.activeUser?.id || "local-user", requestedAt: Date.now(), status: restaurant.requireApproval ? "pending" : "approved" });
+  if (!restaurant.requireApproval && state.activeUser) {
+    state.activeUser.restaurantId = restaurant.id;
+    restaurant.members = upsertById(restaurant.members || [], { id: state.activeUser.id, userId: state.activeUser.id, role: state.activeUser.role || "Server", joinedAt: Date.now(), permissions: permissionsForRole(state.activeUser.role || "Server") });
+  }
+  state.restaurants = upsertById(state.restaurants, restaurant);
+  safeWrite(STORAGE_KEYS.restaurants, state.restaurants);
+  toast(restaurant.requireApproval ? "Join request sent for GM approval." : "Joined store.");
 }
 
 function renderNavigation() {
@@ -980,7 +1368,7 @@ function renderNavigation() {
     menueditor: ["Menu Editor", "Search, edit, import, and export store POS menu data."],
     orders: ["Orders", "Active table orders grouped by seat."],
     pos: ["POS Queue", "Items to ring into the physical POS."],
-    stations: ["Stations", "Prep alerts and server sections."],
+    stations: ["Window", "Prep stations and server sections."],
     sidework: ["Side Work", "What should I do right now?"],
     messages: ["Messages", "Local notes for roles, stations, and table help."],
     tabledashboard: ["Table Dashboard", "Seat-first ordering and table actions."],
@@ -995,7 +1383,7 @@ function renderNavigation() {
   els.viewTitle.textContent = title[0];
   els.viewSubtitle.textContent = title[1];
   els.editModeButton.classList.toggle("hidden", state.activeView !== "floor");
-  els.alertsButton?.classList.toggle("hidden", state.activeView === "gm");
+  updateNotificationBubble();
   document.body.classList.toggle("mobile-nav-open", state.mobileNavOpen);
   document.body.classList.toggle("nav-compact", Boolean(state.settings.navigation?.compact));
   els.mobileNavDrawer?.classList.toggle("hidden", !state.mobileNavOpen);
@@ -1008,6 +1396,7 @@ function currentRole() {
 
 function canAccessView(view) {
   if (["tabledashboard", "orderworkspace"].includes(view)) return true;
+  if (view === "alerts") return false;
   if (["flooreditor", "menueditor", "developer"].includes(view)) return canUseAdminTools();
   if (view === "analytics") return hasAnyRole(["General Manager", "Manager", "Supervisor"]);
   if (view === "gm") return hasAnyRole(GM_ROLES);
@@ -1015,7 +1404,7 @@ function canAccessView(view) {
 }
 
 function shouldShowNavView(view) {
-  if (["menu", "menueditor", "flooreditor", "developer", "stations"].includes(view)) return canAccessView(view) && hasAnyRole(MANAGER_ROLES);
+  if (["menu", "menueditor", "flooreditor", "developer"].includes(view)) return canAccessView(view) && hasAnyRole(MANAGER_ROLES);
   return canAccessView(view);
 }
 
@@ -1048,10 +1437,10 @@ function renderHome() {
     <div class="home-hero">
       <div>
         <h2>${escapeHtml(greetingName())}</h2>
-        <p>${escapeHtml(state.settings.branding?.restaurantName || "TableFlow")} - Current shift</p>
+        <p>${escapeHtml(state.settings.branding?.restaurantName || "Denny's Store")} - ${isClockedIn() ? "Clocked In" : "Clocked Out"}</p>
       </div>
       <div class="button-row">
-        <button class="primary" id="homeStartTableButton" type="button">Start Table</button>
+        <button class="primary" id="homeStartTableButton" type="button">${isClockedIn() ? "Start Table" : "Clock In"}</button>
         <button id="homePosButton" type="button">POS Queue</button>
         <button id="homeSideWorkButton" type="button">Side Work</button>
         <button id="homeMessagesButton" type="button">Messages</button>
@@ -1069,6 +1458,7 @@ function renderHome() {
         ["Unread Messages", metrics.messages]
       ].map(([label, value]) => `<div class="stat-card"><p>${label}</p><h3>${value}</h3></div>`).join("")}
     </div>
+    ${!isClockedIn() ? `<section class="section-card clock-required-card"><h3>Clock in before starting tables.</h3><p>Select your Denny's section and tables to unlock service actions.</p><button class="primary" id="homeClockInCardButton" type="button">Clock In</button></section>` : ""}
     <section class="settings-card">
       <div class="section-header"><h3>Active Tables</h3><p>Assigned tables appear first, then oldest active tables.</p></div>
       <div class="cards-grid">
@@ -1077,6 +1467,7 @@ function renderHome() {
     </section>
   `;
   document.getElementById("homeStartTableButton").addEventListener("click", openStartTableFlow);
+  document.getElementById("homeClockInCardButton")?.addEventListener("click", () => openClockInFlow());
   document.getElementById("homePosButton").addEventListener("click", () => setView("pos"));
   document.getElementById("homeSideWorkButton").addEventListener("click", () => setView("sidework"));
   document.getElementById("homeMessagesButton").addEventListener("click", () => setView("messages"));
@@ -1095,7 +1486,7 @@ function renderHomeActiveTableCard(table) {
       <p>Party ${tableState.partySize || 0} - ${escapeHtml(tableState.status)}</p>
       <p>Active: ${getActiveMinutes(tableState)}m</p>
       <p>Next: ${escapeHtml(next.label)}</p>
-      <p>Server: ${escapeHtml(state.profile.name || state.activeUser?.name || "Server")}</p>
+      <p>Server: ${escapeHtml(tableState.ownerName || state.profile.name || state.activeUser?.name || "Server")}</p>
       <p>Items: ${tableState.orders.filter((order) => order.status !== "cancelled_removed").length}</p>
       <p>Alerts: ${alerts}${checkBack ? " - Check Back Due" : ""}</p>
       <button class="primary" data-open-dashboard="${table.id}" type="button">Open</button>
@@ -1132,6 +1523,7 @@ function greetingName() {
 }
 
 function renderFloor() {
+  renderFloorOverview();
   els.floorCanvas.innerHTML = "";
   renderMobileFloorList();
   els.floorPlan.classList.toggle("snap-off", !state.settings.snap);
@@ -1141,7 +1533,8 @@ function renderFloor() {
     const el = document.createElement("button");
     el.type = "button";
     const checkBackState = object.category === "table" ? getCheckBackDisplayState(object.id) : null;
-    el.className = `layout-object object-${object.category} ${object.type} status-${cssStatus(status)} ${checkBackState?.pulse ? "checkback-pulse" : ""} ${object.id === state.selectedTableId ? "selected" : ""}`;
+    const mine = object.category === "table" && getCurrentAssignedTableIds().includes(object.id);
+    el.className = `layout-object object-${object.category} ${object.type} status-${cssStatus(status)} ${checkBackState?.pulse ? "checkback-pulse" : ""} ${mine ? "mine-table" : ""} ${object.id === state.selectedTableId ? "selected" : ""}`;
     el.style.left = `${object.x}px`;
     el.style.top = `${object.y}px`;
     el.style.width = `${object.width}px`;
@@ -1152,6 +1545,7 @@ function renderFloor() {
     el.innerHTML = `
       <span class="object-inner">
         <span class="object-name">${escapeHtml(object.name)}</span>
+        ${mine ? `<span class="object-badge mine-badge">Mine</span>` : ""}
         <span class="object-status">${escapeHtml(object.category === "table" ? status : object.type)}</span>
         ${checkBackState?.label ? `<span class="object-badge">${escapeHtml(checkBackState.label)}</span>` : ""}
         <span class="object-meta">${object.category === "table" ? `${tableState?.partySize || 0}/${object.seats} guests` : object.category}</span>
@@ -1161,6 +1555,29 @@ function renderFloor() {
     el.addEventListener("contextmenu", (event) => openTableContextMenu(event, object));
     els.floorCanvas.appendChild(el);
   });
+}
+
+function renderFloorOverview() {
+  if (!els.floorOverview) return;
+  const tables = state.layoutConfig.objects.filter((object) => object.category === "table");
+  const active = tables.filter((table) => !isTableReadyForStart(table.id));
+  const ready = tables.length - active.length;
+  const mine = getCurrentAssignedTableIds().length;
+  const attention = active.filter((table) => getCheckBackDisplayState(table.id) || state.currentShift.alerts.some((alert) => alert.tableId === table.id && alert.status !== "done")).length;
+  els.floorOverview.innerHTML = `
+    <section class="floor-status-strip">
+      <div><span>Ready Tables</span><strong>${ready}</strong></div>
+      <div><span>Active</span><strong>${active.length}</strong></div>
+      <div><span>Mine</span><strong>${mine}</strong></div>
+      <div><span>Needs Attention</span><strong>${attention}</strong></div>
+    </section>
+    <section class="floor-legend">
+      <span><i class="legend-dot ready"></i> Ready</span>
+      <span><i class="legend-dot seated"></i> Seated</span>
+      <span><i class="legend-dot waiting"></i> Waiting Food</span>
+      <span><i class="legend-dot mine"></i> Mine</span>
+    </section>
+  `;
 }
 
 function renderMobileFloorList() {
@@ -1177,12 +1594,28 @@ function renderMobileFloorList() {
   els.mobileFloorList.querySelectorAll("[data-mobile-floor-table]").forEach((button) => button.addEventListener("click", () => {
     const tableId = button.dataset.mobileFloorTable;
     if (isTableReadyForStart(tableId)) {
-      state.startFlow.tableId = tableId;
-      renderPartySizePicker();
+      requireClockedIn(() => {
+        state.startFlow.tableId = tableId;
+        renderPartySizePicker();
+      });
     } else {
       openTableDashboard(tableId);
     }
   }));
+  els.mobileFloorList.querySelectorAll("[data-mobile-floor-table]").forEach((button) => {
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const table = getTable(button.dataset.mobileFloorTable);
+      if (table) openTableContextMenu(event, table);
+    });
+    button.addEventListener("pointerdown", (event) => {
+      const table = getTable(button.dataset.mobileFloorTable);
+      clearLongPress();
+      state.longPressTimer = window.setTimeout(() => table && openTableContextMenu(event, table), 600);
+    });
+    button.addEventListener("pointerup", clearLongPress);
+    button.addEventListener("pointercancel", clearLongPress);
+  });
 }
 
 function renderMobileFloorSection(title, tables) {
@@ -1199,11 +1632,14 @@ function renderMobileFloorSection(title, tables) {
 function renderMobileFloorCard(table) {
   const tableState = getTableState(table.id);
   const checkBack = getCheckBackDisplayState(table.id);
+  const mine = getCurrentAssignedTableIds().includes(table.id);
+  const owner = tableState.ownerName || getStationName(table.stationId);
   return `
-    <button class="mobile-table-card status-${cssStatus(tableState.status)} ${checkBack ? "needs-attention" : ""}" data-mobile-floor-table="${table.id}" type="button">
-      <strong>${escapeHtml(table.name)}</strong>
+    <button class="mobile-table-card status-${cssStatus(tableState.status)} ${checkBack ? "needs-attention" : ""} ${mine ? "mine-table" : ""}" data-mobile-floor-table="${table.id}" type="button">
+      <strong>${escapeHtml(table.name)}${mine ? " - Mine" : ""}</strong>
       <span>${escapeHtml(table.type)} - ${table.seats} seats</span>
       <span>${escapeHtml(tableState.status || "Open")}${tableState.partySize ? ` - Party ${tableState.partySize}` : ""}</span>
+      <span>${escapeHtml(owner)}</span>
       <small>${tableState.partySize ? `Active ${getActiveMinutes(tableState)}m` : "Ready to seat"}</small>
     </button>
   `;
@@ -1942,13 +2378,14 @@ function showReadyTableOptions(tableId) {
       <button id="closeModalButton" type="button">Cancel</button>
     </div>
   `);
-  document.getElementById("readyStartButton").addEventListener("click", () => { state.startFlow.tableId = tableId; renderPartySizePicker(); });
+  document.getElementById("readyStartButton").addEventListener("click", () => requireClockedIn(() => { state.startFlow.tableId = tableId; renderPartySizePicker(); }));
   document.getElementById("readyInfoButton").addEventListener("click", () => { closeModal(); state.selectedTableId = tableId; renderAll(); });
   document.getElementById("closeModalButton").addEventListener("click", closeModal);
 }
 
 function openTableDashboard(tableId) {
   state.selectedTableId = tableId;
+  state.currentShift.activeTableId = tableId;
   const tableState = getTableState(tableId);
   if (!tableState.selectedSeat && tableState.partySize) tableState.selectedSeat = 1;
   setView("tabledashboard");
@@ -2191,7 +2628,7 @@ function hasMenuPrice(item) {
 }
 
 function isServiceMenuItem(item) {
-  return Boolean(item && item.active !== false && item.orderable !== false && item.category !== "MODS" && isDennyLocationMenuItem(item) && hasMenuPrice(item));
+  return Boolean(item && item.active !== false && item.orderable !== false && item.category !== "MODS" && isDennyLocationMenuItem(item) && (hasMenuPrice(item) || item.category === "BEV"));
 }
 
 function isAppCategory(category) {
@@ -2673,30 +3110,48 @@ function showOrderDetail(tableId) {
 // POS Queue
 function renderPosQueue() {
   const rows = getPosQueueRows();
+  const pendingRows = rows.filter((row) => !isDeliveredQueueStatus(row.queueStatus) && row.queueStatus !== "cancelled_removed");
+  const readyRows = rows.filter((row) => row.queueStatus === "food_ready");
+  const waitingRows = rows.filter((row) => row.queueStatus === "waiting_for_food");
   const drinkActions = getTablesWithUndeliveredDrinks().map((table) => `
-    <div class="pos-queue-card drink-round-card">
-      <h4>${escapeHtml(table.name)} - Drink Round</h4>
+    <div class="pos-queue-card drink-round-card pos-feature-card">
+      <div class="pos-card-top"><span class="pos-status-dot drink"></span><h4>${escapeHtml(table.name)} Drink Round</h4></div>
       <p>${getUndeliveredDrinkOrders(table.id).length} drinks not delivered</p>
       <button class="primary" data-deliver-drinks-table="${table.id}" type="button">Deliver Drinks</button>
     </div>
   `).join("");
-  els.posQueueList.innerHTML = rows.length || drinkActions ? drinkActions + rows.map((row) => `
-    <div class="pos-queue-card priority-${row.priority} pos-status-${cssQueueStatus(row.queueStatus)} ${isDeliveredQueueStatus(row.queueStatus) ? "delivered" : ""}">
-      <h4>${escapeHtml(row.tableName)} - Seat ${row.seatNumber || 1}</h4>
-      <p>Table status: ${escapeHtml(getTableState(row.tableId).status)}</p>
-      <p>${escapeHtml(row.category)} / ${escapeHtml(row.posKey || row.shortName)}</p>
-      <p><strong>${isDeliveredQueueStatus(row.queueStatus) ? "[Delivered] " : ""}${escapeHtml(getPosStatusLabel(row.queueStatus))}</strong></p>
-      ${row.modifiers.length ? `<p>Mods: ${escapeHtml(row.modifiers.join(", "))}</p>` : ""}
-      <div class="alert-actions">
-        <button data-added-main="${row.tableId}|${row.id}" type="button">Added to Main POS</button>
-        <button data-waiting-food="${row.tableId}|${row.id}" type="button">Waiting for Food</button>
-        <button data-food-ready="${row.tableId}|${row.id}" type="button">Mark Food Ready</button>
-        <button class="primary" data-delivered="${row.tableId}|${row.id}" type="button">Mark Delivered</button>
-        <button data-check="${row.tableId}" type="button">Guest Check</button>
-      </div>
-    </div>
-  `).join("") : `<div class="settings-card">POS queue is clear.</div>`;
+  els.posQueueList.innerHTML = `
+    <section class="pos-queue-summary">
+      <div><span>Needs POS</span><strong>${pendingRows.filter((row) => row.queueStatus === "needs_rung_in").length}</strong></div>
+      <div><span>Waiting Food</span><strong>${waitingRows.length}</strong></div>
+      <div><span>Food Ready</span><strong>${readyRows.length}</strong></div>
+      <div><span>Total Open</span><strong>${pendingRows.length}</strong></div>
+    </section>
+    ${rows.length || drinkActions ? `<section class="pos-queue-board">${drinkActions}${rows.map(renderPosQueueCard).join("")}</section>` : `<div class="empty-state">POS queue is clear.</div>`}
+  `;
   bindPosQueueButtons();
+}
+
+function renderPosQueueCard(row) {
+  const statusLabel = getPosStatusLabel(row.queueStatus);
+  return `
+    <article class="pos-queue-card priority-${row.priority} pos-status-${cssQueueStatus(row.queueStatus)} ${isDeliveredQueueStatus(row.queueStatus) ? "delivered" : ""}">
+      <div class="pos-card-top">
+        <span class="pos-status-dot ${cssQueueStatus(row.queueStatus)}"></span>
+        <div><h4>${escapeHtml(row.tableName)} <small>Seat ${row.seatNumber || 1}</small></h4><p>${escapeHtml(getTableState(row.tableId).status)}</p></div>
+      </div>
+      <div class="pos-item-name">${escapeHtml(row.shortName || row.itemName || row.posKey)}</div>
+      <div class="pos-meta-row"><span>${escapeHtml(row.category)}</span><strong>${escapeHtml(statusLabel)}</strong></div>
+      ${row.modifiers.length ? `<p class="pos-mods">${escapeHtml(row.modifiers.join(", "))}</p>` : ""}
+      <div class="pos-action-grid">
+        <button data-added-main="${row.tableId}|${row.id}" type="button">In POS</button>
+        <button data-waiting-food="${row.tableId}|${row.id}" type="button">Waiting</button>
+        <button data-food-ready="${row.tableId}|${row.id}" type="button">Ready</button>
+        <button class="primary" data-delivered="${row.tableId}|${row.id}" type="button">Delivered</button>
+        <button data-check="${row.tableId}" type="button">Check</button>
+      </div>
+    </article>
+  `;
 }
 
 function getPosQueueRows() {
@@ -2780,7 +3235,7 @@ function showGuestCheck(tableId) {
   showModal(`
     <div class="guest-check">
       <div class="guest-check-title">GUEST CHECK</div>
-      ${state.settings.branding?.useLogoOnGuestCheck && state.settings.branding.logoDataUrl ? `<div class="guest-check-logo"><img src="${state.settings.branding.logoDataUrl}" alt="" /></div>` : ""}
+      ${state.settings.branding?.useLogoOnGuestCheck && (state.settings.branding.logoDataUrl || state.settings.branding.logoAssetPath) ? `<div class="guest-check-logo"><img src="${state.settings.branding.logoDataUrl || state.settings.branding.logoAssetPath}" alt="" /></div>` : ""}
       <div class="guest-check-fields">
         <span>Date: ${new Date().toLocaleDateString()}</span>
         <span>Table: ${escapeHtml(table.name)}</span>
@@ -3089,21 +3544,55 @@ function checkBackDueEvent(type) {
 }
 
 function renderStations() {
-  const activeAlerts = state.currentShift.alerts.filter((alert) => alert.status !== "done");
-  els.alertCount.textContent = activeAlerts.length;
-  els.notificationList.innerHTML = activeAlerts.length ? activeAlerts.map((alert) => `
-    <div class="alert-card">
-      <h4>${escapeHtml(alert.message)}</h4>
-      <p>${escapeHtml(alert.status)}${alert.claimedBy ? ` by ${escapeHtml(alert.claimedBy)}` : ""}</p>
-      <div class="alert-actions">
-        <button data-claim-alert="${alert.id}" type="button">Claim</button>
-        <button class="primary" data-done-alert="${alert.id}" type="button">Done</button>
-      </div>
-    </div>
-  `).join("") : `<div class="settings-card">No active alerts.</div>`;
-  els.notificationList.querySelectorAll("[data-claim-alert]").forEach((button) => button.addEventListener("click", () => updateAlert(button.dataset.claimAlert, "claimed")));
-  els.notificationList.querySelectorAll("[data-done-alert]").forEach((button) => button.addEventListener("click", () => updateAlert(button.dataset.doneAlert, "done")));
+  const activeAlerts = getRoleAlerts();
   els.stationsList.innerHTML = state.layoutConfig.stations.map((station) => `<div class="station-summary"><h4>${escapeHtml(station.name)}</h4><p>${station.type}</p><p>Capabilities: ${(station.capabilities || []).join(", ") || "Server section"}</p><p>Active alerts: ${activeAlerts.filter((alert) => alert.stationId === station.id).length}</p></div>`).join("");
+  updateNotificationBubble();
+}
+
+function updateNotificationBubble() {
+  const count = getRoleAlerts().length;
+  if (!els.alertsButton || !els.alertCount) return;
+  els.alertCount.textContent = count;
+  els.alertsButton.classList.toggle("hidden", count === 0);
+  els.alertsButton.classList.toggle("pulse", count > 0);
+}
+
+function showAlertsDrawer() {
+  const activeAlerts = getRoleAlerts();
+  showModal(`
+    <div class="flow-header">
+      <div><h3>Notifications</h3><p>${activeAlerts.length} active service ${activeAlerts.length === 1 ? "notification" : "notifications"}</p></div>
+      <button id="closeModalButton" type="button">Close</button>
+    </div>
+    <div class="alert-drawer-list">
+      ${activeAlerts.length ? activeAlerts.map((alert) => `
+        <div class="alert-card compact-alert-card">
+          <h4>${escapeHtml(alert.message)}</h4>
+          <p>${escapeHtml(alert.status)}${alert.claimedBy ? ` by ${escapeHtml(alert.claimedBy)}` : ""}</p>
+          <div class="alert-actions">
+            <button data-claim-alert="${alert.id}" type="button">Claim</button>
+            <button class="primary" data-done-alert="${alert.id}" type="button">Done</button>
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">No active notifications.</div>`}
+    </div>
+  `);
+  document.getElementById("closeModalButton").addEventListener("click", closeModal);
+  document.querySelectorAll("[data-claim-alert]").forEach((button) => button.addEventListener("click", () => updateAlert(button.dataset.claimAlert, "claimed")));
+  document.querySelectorAll("[data-done-alert]").forEach((button) => button.addEventListener("click", () => updateAlert(button.dataset.doneAlert, "done")));
+}
+
+function getRoleAlerts() {
+  const role = currentRole();
+  const assigned = new Set(getCurrentAssignedTableIds());
+  return (state.currentShift.alerts || []).filter((alert) => {
+    if (alert.status === "done") return false;
+    if (role === "General Manager" || role === "Manager" || role === "Supervisor" || role === "PIC") return true;
+    if (role === "Server") return !alert.tableId || assigned.has(alert.tableId) || ["sidework_due", "prep_alert", "message", "table_sat_for_you", "checkback"].includes(alert.type);
+    if (role === "Host") return ["seating", "waitlist", "table_sat", "manager_request", "message"].includes(alert.type) || !alert.tableId;
+    if (role === "Dishwasher") return ["dish", "sidework_due", "message"].includes(alert.type);
+    return true;
+  });
 }
 
 function updateAlert(alertId, status) {
@@ -3124,8 +3613,8 @@ function renderMessages() {
     <section class="settings-card message-compose">
       <h4>Send Local Message</h4>
       <div class="form-grid">
-        <label class="field"><span>Type</span><select id="messageTypeInput"><option>General</option><option>Table Help</option><option>Side Work</option><option>Manager Needed</option><option>Kitchen Note placeholder</option></select></label>
-        <label class="field"><span>Target</span><select id="messageTargetInput"><option>All</option><option>Managers</option><option>Servers</option><option>Hosts</option><option>Station 1</option><option>Station 2</option><option>Kitchen placeholder</option></select></label>
+        <label class="field"><span>Type</span><select id="messageTypeInput"><option>General</option><option>Table Help</option><option>Side Work</option><option>Manager Needed</option><option>Kitchen Note</option></select></label>
+        <label class="field"><span>Target</span><select id="messageTargetInput"><option>All</option><option>Managers</option><option>Servers</option><option>Hosts</option><option>Station 1</option><option>Station 2</option><option>Kitchen</option></select></label>
         <label class="field wide"><span>Message</span><textarea id="messageTextInput" rows="3" placeholder="Example: Can someone run food to Table 7?"></textarea></label>
       </div>
       <button class="primary" id="sendLocalMessageButton" type="button">Send Message</button>
@@ -3620,8 +4109,320 @@ function renderSettings() {
   els.brandingButtonStyleInput.value = b.buttonStyle || "rounded";
   els.brandingGuestCheckLogoToggle.checked = b.useLogoOnGuestCheck !== false;
   els.brandingLoginLogoToggle.checked = b.useLogoOnLogin !== false;
-  els.logoPreview.innerHTML = b.logoDataUrl ? `<img src="${b.logoDataUrl}" alt="Store logo preview" />` : `<p>No logo uploaded.</p>`;
+  els.logoPreview.innerHTML = (b.logoDataUrl || b.logoAssetPath) ? `<img src="${b.logoDataUrl || b.logoAssetPath}" alt="Store logo preview" />` : `<p>No logo uploaded.</p>`;
   renderThemePresets();
+  renderSettingsSurface();
+}
+
+function renderSettingsSurface() {
+  if (!els.settingsPanel) return;
+  if (state.settingsPage && state.settingsPage !== "main") {
+    els.settingsPanel.innerHTML = renderSettingsSubpage(state.settingsPage);
+    bindSettingsSurfaceActions();
+    return;
+  }
+  const cards = [
+    ["account", "Account & Security", "Local account, PIN lock, sign out, and store team identity.", "AC"],
+    ["appearance", "Appearance", "Mode, navigation density, theme preset, and iOS Glass.", "AP"],
+    ["branding", "Store Branding", "Denny's store name, number, colors, and single stored logo.", "BR"],
+    ["notifications", "Notifications", "Compact alerts, push support, chimes, and voice style.", "NO"],
+    ["shift", "Shift / Clock In", "Clock in, assigned section, table ownership, and summaries.", "SH"],
+    ["menu", "Menu & Pricing", "Denny's menu source, overrides, prices, and CSV exports.", "MN"],
+    ["storage", "Data & Storage", "Usage, cleanup, backups, import, and local data policy.", "DS"],
+    ["integrations", "Integrations", "Online store sync plus future Toast, Square, Clover, KDS, scheduling, and payroll.", "IN"],
+    ["developer", "Developer Tools", "Tester controls, debug report, and device previews.", "DV"],
+    ["about", "About TableFlow", "Version, repository defaults, and local-first sync status.", "TF"]
+  ];
+  els.settingsPanel.innerHTML = `
+    <div class="settings-category-grid">
+      ${cards.map(([key, title, desc, icon]) => `
+        <button class="settings-category-card" data-settings-page="${key}" type="button">
+          <span class="settings-card-icon">${icon}</span>
+          <strong>${escapeHtml(title)}</strong>
+          <small>${escapeHtml(desc)}</small>
+        </button>
+      `).join("")}
+    </div>
+  `;
+  bindSettingsSurfaceActions();
+}
+
+function renderSettingsSubpage(page) {
+  const titleMap = {
+    account: ["Account & Security", "Local team identity and device protection."],
+    appearance: ["Appearance", "Theme, light/dark mode, and POS tablet density."],
+    branding: ["Store Branding", "Denny's store identity without duplicating large logo blobs."],
+    notifications: ["Notifications", "Compact service alerts for every role."],
+    shift: ["Shift / Clock In", "Clock in, assigned tables, and shift summary tools."],
+    menu: ["Menu & Pricing", "Default Denny's menu plus local override exports."],
+    storage: ["Data & Storage", "Repository defaults, IndexedDB live data, cleanup, and backup."],
+    integrations: ["Integrations", "Online sync endpoint and future POS, KDS, delivery, reservation, scheduling, and payroll links."],
+    developer: ["Developer Tools", "Local tester and diagnostics."],
+    about: ["About TableFlow", "Denny's-only local-first TableFlow setup."]
+  };
+  const [title, desc] = titleMap[page] || titleMap.about;
+  return `
+    <div class="settings-subpage">
+      <div class="page-header">
+        <button class="secondary" data-settings-page="main" type="button">Back</button>
+        <div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(desc)}</p></div>
+      </div>
+      ${renderSettingsSubpageBody(page)}
+    </div>
+  `;
+}
+
+function renderSettingsSubpageBody(page) {
+  if (page === "account") return `
+    <section class="section-card">
+      <h4>Account</h4>
+      <p>${escapeHtml(state.activeUser ? `${state.activeUser.name || state.activeUser.fullName} - ${state.activeUser.email}` : "No active local account")}</p>
+      <div class="action-row"><span>PIN lock</span><strong>${state.settings.pinEnabled ? "Enabled" : "Off"}</strong></div>
+      <div class="button-row"><button class="primary" id="settingsLockAppAction" type="button">Lock App</button><button class="danger" id="settingsSignOutAction" type="button">Sign Out</button><button data-settings-page="developer" type="button">Developer Commands</button></div>
+    </section>`;
+  if (page === "appearance") return `
+    <section class="section-card">
+      <h4>Theme Presets</h4>
+      <div class="theme-preset-grid">${Object.entries(THEME_PRESETS).map(([key, preset]) => `<button class="theme-preset" data-apply-theme="${key}" type="button"><div class="theme-swatch" style="background:${preset.bg}"><span style="background:${preset.primary}"></span><span style="background:${preset.secondary}"></span><span style="background:${preset.accent}"></span></div><strong>${escapeHtml(preset.name)}</strong></button>`).join("")}</div>
+      <label class="switch-row"><input id="settingsLightModeMirror" type="checkbox" ${state.settings.theme === "light" ? "checked" : ""} /> Light mode</label>
+      <label class="switch-row"><input id="settingsCompactMirror" type="checkbox" ${state.settings.navigation?.compact ? "checked" : ""} /> Compact tablet navigation</label>
+    </section>`;
+  if (page === "branding") return `
+    <section class="section-card">
+      <h4>Denny's Store Branding</h4>
+      <div class="form-grid">
+        <label class="field"><span>Store name</span><input id="settingsStoreNameMirror" value="${escapeHtml(state.settings.branding.restaurantName || "Denny's Store")}" /></label>
+        <label class="field"><span>Store number</span><input id="settingsStoreNumberMirror" value="${escapeHtml(state.settings.branding.storeNumber || "")}" /></label>
+      </div>
+      <p class="storage-note">Logo is stored once by key and referenced by settings, not copied into every data object.</p>
+      <div class="button-row"><button class="primary" id="settingsSaveBrandingMirror" type="button">Save Branding</button><button id="uploadLogoMirror" type="button">Upload Logo</button><button id="removeLogoMirror" type="button">Remove Logo</button></div>
+    </section>`;
+  if (page === "notifications") return `
+    <section class="section-card">
+      <h4>Alerts</h4>
+      <div class="action-row"><span>Role filter</span><strong>${escapeHtml(currentRole())}</strong></div>
+      <div class="action-row"><span>Active alerts</span><strong>${getRoleAlerts().length}</strong></div>
+      <label class="switch-row"><input id="settingsInAppAlertsMirror" type="checkbox" ${getNotificationSettings().inAppAlerts !== false ? "checked" : ""} /> In-app alert toasts</label>
+      <button id="settingsRequestPushButton" type="button">Request iOS / Browser Permission</button>
+      <p class="security-note">${escapeHtml(getNotificationSupport().message)}</p>
+      <button class="primary" id="settingsOpenNotificationsButton" type="button">Open Notifications</button>
+    </section>`;
+  if (page === "shift") return `
+    <section class="section-card">
+      <h4>Current Shift</h4>
+      <div class="action-row"><span>Status</span><strong>${isClockedIn() ? "Clocked In" : "Clocked Out"}</strong></div>
+      <div class="action-row"><span>Assigned tables</span><strong>${getCurrentAssignedTableIds().length}</strong></div>
+      <div class="button-row"><button class="primary" id="settingsClockAction" type="button">${isClockedIn() ? "Clock Out" : "Clock In"}</button><button data-view="profile" type="button">View Profile</button></div>
+    </section>`;
+  if (page === "menu") return `
+    <section class="section-card">
+      <h4>Denny's Menu</h4>
+      <p>Default source: <code>data/dennys-menu.csv</code>. Edits are saved as local menu overrides in IndexedDB.</p>
+      <div class="button-row"><button id="downloadDennyMenuButton" type="button">Download Denny's Menu CSV</button><button id="exportMenuCsvMirror" type="button">Export Edited Menu CSV</button><button data-view="menueditor" type="button">Open Menu Editor</button></div>
+    </section>`;
+  if (page === "storage") return renderStorageSettingsBody();
+  if (page === "integrations") return `
+    <section class="section-card cloud-sync-card">
+      <h4>Online Store Sync</h4>
+      <p>Use a shared REST, Supabase Edge Function, Firebase endpoint, or future TableFlow cloud endpoint so two devices can share table status, active orders, POS queue, messages, alerts, and shift activity.</p>
+      <div class="sync-status-row">
+        <span class="status-chip ${state.settings.sync?.status === "online" ? "ok" : state.settings.sync?.status === "error" ? "danger" : ""}">${escapeHtml(state.settings.sync?.status || "offline")}</span>
+        <span>${state.settings.sync?.lastPush ? `Last push ${formatClock(state.settings.sync.lastPush)}` : "Not pushed yet"}</span>
+        <span>${state.settings.sync?.lastPull ? `Last pull ${formatClock(state.settings.sync.lastPull)}` : "Not pulled yet"}</span>
+      </div>
+      <label class="switch-row"><input id="settingsSyncEnabledInput" type="checkbox" ${state.settings.sync?.enabled ? "checked" : ""} /> Enable online sync</label>
+      <div class="form-grid">
+        <label class="field"><span>Sync endpoint URL</span><input id="settingsSyncEndpointInput" type="url" placeholder="https://your-sync-endpoint/tableflow-store" value="${escapeHtml(state.settings.sync?.endpoint || "")}" /></label>
+        <label class="field"><span>API key / token (optional)</span><input id="settingsSyncApiKeyInput" type="password" value="${escapeHtml(state.settings.sync?.apiKey || "")}" /></label>
+        <label class="field"><span>Poll interval seconds</span><input id="settingsSyncIntervalInput" type="number" min="5" max="300" value="${Number(state.settings.sync?.intervalSeconds || 15)}" /></label>
+      </div>
+      ${state.settings.sync?.lastError ? `<p class="security-note danger-note">${escapeHtml(state.settings.sync.lastError)}</p>` : `<p class="security-note">Local mode still works offline. When this is enabled, TableFlow pulls online state, merges fresh table updates, then pushes this device's latest service state.</p>`}
+      <div class="button-row">
+        <button class="primary" id="saveSyncSettingsButton" type="button">Save Sync Settings</button>
+        <button id="pushSyncNowButton" type="button">Push Now</button>
+        <button id="pullSyncNowButton" type="button">Pull Now</button>
+        <button id="testSyncButton" type="button">Test Sync</button>
+      </div>
+    </section>
+    <section class="section-card">
+      <h4>Future Integrations</h4>
+      <div class="integration-grid">${["Toast POS", "Square POS", "Clover", "Kitchen Display", "Delivery Orders", "QR Menu", "Reservation System", "Shift Scheduling", "Payroll export"].map((name) => `<div class="integration-tile"><strong>${name}</strong><span>Planned</span></div>`).join("")}</div>
+    </section>`;
+  if (page === "developer") return `
+    <section class="section-card">
+      <h4>Developer Tools</h4>
+      <p>Debug tools stay here unless Developer Mode is enabled.</p>
+      <label class="switch-row"><input id="settingsDeveloperMirror" type="checkbox" ${state.settings.developer?.enabled ? "checked" : ""} /> Developer Mode</label>
+      <button class="primary" data-view="developer" type="button">Open Developer Tools</button>
+    </section>`;
+  return `
+    <section class="section-card">
+      <h4>TableFlow for Denny's</h4>
+      <p>Version ${escapeHtml(APP_VERSION)}. Repository files provide default Denny's configs. Browser storage keeps active shift data on this device.</p>
+      <p>Future sync can connect Firebase, Supabase, REST APIs, or WebSocket updates.</p>
+    </section>`;
+}
+
+function renderStorageSettingsBody() {
+  const usage = estimateStorageUsage();
+  return `
+    <section class="section-card">
+      <h4>Data & Storage</h4>
+      <p class="storage-note">Default Denny's configs load from repository files. Live shift data is stored locally on this device. Export data to back it up or move it.</p>
+      <div class="dashboard-stats">
+        <div class="stat-card"><p>localStorage estimate</p><h3>${usage.localKb} KB</h3></div>
+        <div class="stat-card"><p>IndexedDB</p><h3>${state.storage.idbAvailable ? "On" : "Fallback"}</h3></div>
+        <div class="stat-card"><p>Events</p><h3>${state.analytics.events.length}</h3></div>
+      </div>
+      <div class="button-row">
+        <button class="primary" id="exportCurrentShiftButton" type="button">Export Current Shift</button>
+        <button id="exportAllLocalButton" type="button">Export All Local Data</button>
+        <button id="importBackupMirror" type="button">Import Backup</button>
+        <button id="downloadDennyMenuButton" type="button">Download Denny's Menu CSV</button>
+        <button id="downloadDennyLayoutButton" type="button">Download Floor Layout JSON</button>
+        <button id="cleanupShiftsButton" type="button">Clear completed shifts older than 30 days</button>
+        <button id="cleanupPosButton" type="button">Clear delivered POS queue history</button>
+        <button id="cleanupAnalyticsButton" type="button">Clear old analytics events</button>
+        <button id="cleanupMessagesButton" type="button">Clear old messages</button>
+        <button id="compactStorageButton" type="button">Compact storage</button>
+      </div>
+    </section>`;
+}
+
+function bindSettingsSurfaceActions() {
+  els.settingsPanel?.querySelectorAll("[data-settings-page]").forEach((button) => button.addEventListener("click", () => {
+    state.settingsPage = button.dataset.settingsPage;
+    renderSettingsSurface();
+  }));
+  els.settingsPanel?.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+  els.settingsPanel?.querySelectorAll("[data-apply-theme]").forEach((button) => button.addEventListener("click", () => applyThemePreset(button.dataset.applyTheme)));
+  document.getElementById("settingsLockAppAction")?.addEventListener("click", lockApp);
+  document.getElementById("settingsSignOutAction")?.addEventListener("click", logoutLocal);
+  document.getElementById("settingsLightModeMirror")?.addEventListener("change", (event) => { setTheme(event.target.checked ? "light" : "dark"); saveAll(true); renderAll(); });
+  document.getElementById("settingsCompactMirror")?.addEventListener("change", (event) => { state.settings.navigation.compact = event.target.checked; saveAll(true); renderAll(); });
+  document.getElementById("settingsInAppAlertsMirror")?.addEventListener("change", (event) => { state.settings.notificationSettings.inAppAlerts = event.target.checked; saveAll(true); });
+  document.getElementById("settingsRequestPushButton")?.addEventListener("click", requestPushNotifications);
+  document.getElementById("settingsOpenNotificationsButton")?.addEventListener("click", showAlertsDrawer);
+  document.getElementById("settingsDeveloperMirror")?.addEventListener("change", (event) => { state.settings.developer.enabled = event.target.checked; saveAll(true); renderAll(); });
+  document.getElementById("settingsSaveBrandingMirror")?.addEventListener("click", () => {
+    state.settings.branding.restaurantName = document.getElementById("settingsStoreNameMirror").value.trim() || "Denny's Store";
+    state.settings.branding.storeNumber = document.getElementById("settingsStoreNumberMirror").value.trim();
+    saveAll(true);
+    renderAll();
+    toast("Store branding saved.");
+  });
+  document.getElementById("saveSyncSettingsButton")?.addEventListener("click", saveSyncSettingsFromPanel);
+  document.getElementById("pushSyncNowButton")?.addEventListener("click", () => runManualCloudAction(pushCloudSync, "Push"));
+  document.getElementById("pullSyncNowButton")?.addEventListener("click", () => runManualCloudAction(pullCloudSync, "Pull"));
+  document.getElementById("testSyncButton")?.addEventListener("click", testCloudSync);
+  document.getElementById("uploadLogoMirror")?.addEventListener("click", () => els.logoFileInput.click());
+  document.getElementById("removeLogoMirror")?.addEventListener("click", () => { state.settings.branding.logoDataUrl = ""; state.settings.branding.logoKey = ""; state.settings.branding.logoAssetPath = ""; saveAll(true); renderAll(); toast("Logo removed."); });
+  document.getElementById("settingsClockAction")?.addEventListener("click", () => isClockedIn() ? openClockOutFlow() : openClockInFlow());
+  document.getElementById("downloadDennyMenuButton")?.addEventListener("click", () => downloadText("dennys-menu.csv", menuToCsv(getServiceMenuItems()), "text/csv"));
+  document.getElementById("downloadDennyLayoutButton")?.addEventListener("click", () => downloadJson("dennys-layout-default.json", state.layoutConfig));
+  document.getElementById("exportMenuCsvMirror")?.addEventListener("click", exportMenuCsv);
+  document.getElementById("exportCurrentShiftButton")?.addEventListener("click", () => downloadJson("tableflow-current-shift.json", state.currentShift));
+  document.getElementById("exportAllLocalButton")?.addEventListener("click", exportAllData);
+  document.getElementById("importBackupMirror")?.addEventListener("click", () => els.importAllInput.click());
+  document.getElementById("cleanupShiftsButton")?.addEventListener("click", () => cleanupStorage("shifts"));
+  document.getElementById("cleanupPosButton")?.addEventListener("click", () => cleanupStorage("pos"));
+  document.getElementById("cleanupAnalyticsButton")?.addEventListener("click", () => cleanupStorage("analytics"));
+  document.getElementById("cleanupMessagesButton")?.addEventListener("click", () => cleanupStorage("messages"));
+  document.getElementById("compactStorageButton")?.addEventListener("click", compactStorage);
+}
+
+function readSyncSettingsFromPanel() {
+  const endpoint = document.getElementById("settingsSyncEndpointInput")?.value.trim() || "";
+  const apiKey = document.getElementById("settingsSyncApiKeyInput")?.value.trim() || "";
+  const intervalSeconds = Math.max(5, Math.min(300, Number(document.getElementById("settingsSyncIntervalInput")?.value) || 15));
+  state.settings.sync = {
+    ...state.settings.sync,
+    enabled: Boolean(document.getElementById("settingsSyncEnabledInput")?.checked),
+    endpoint,
+    apiKey,
+    intervalSeconds
+  };
+}
+
+function saveSyncSettingsFromPanel() {
+  readSyncSettingsFromPanel();
+  state.settings.sync.status = cloudSyncConfigured() ? "ready" : "offline";
+  state.settings.sync.lastError = "";
+  setupCloudSyncTimer();
+  saveAll(true);
+  renderSettingsSurface();
+  toast(state.settings.sync.enabled ? "Online sync settings saved." : "Online sync is off.");
+}
+
+async function runManualCloudAction(action, label) {
+  readSyncSettingsFromPanel();
+  if (!cloudSyncConfigured()) return toast("Add a sync endpoint and enable online sync first.", "danger");
+  state.settings.sync.status = "syncing";
+  renderSettingsSurface();
+  try {
+    await action(true);
+    state.settings.sync.status = "online";
+    state.settings.sync.lastError = "";
+    saveAll(true);
+    renderAll();
+  } catch (error) {
+    state.settings.sync.status = "error";
+    state.settings.sync.lastError = error.message || `${label} failed.`;
+    saveAll(true);
+    renderSettingsSurface();
+    toast(`${label} failed. Check the sync endpoint.`, "danger");
+  }
+}
+
+async function testCloudSync() {
+  readSyncSettingsFromPanel();
+  if (!cloudSyncConfigured()) return toast("Add a sync endpoint and enable online sync first.", "danger");
+  try {
+    await pullCloudSync(false);
+    await pushCloudSync(false);
+    state.settings.sync.status = "online";
+    state.settings.sync.lastError = "";
+    saveAll(true);
+    renderAll();
+    toast("Online sync test passed.");
+  } catch (error) {
+    state.settings.sync.status = "error";
+    state.settings.sync.lastError = error.message || "Sync test failed.";
+    saveAll(true);
+    renderSettingsSurface();
+    toast("Sync test failed. The app still works locally.", "danger");
+  }
+}
+
+function estimateStorageUsage() {
+  const total = Object.keys(localStorage).reduce((sum, key) => sum + key.length + String(localStorage.getItem(key)).length, 0);
+  state.storage.usageBytes = total;
+  return { localKb: Math.round(total / 1024) };
+}
+
+async function cleanupStorage(type) {
+  const cutoff = Date.now() - 30 * 86400000;
+  if (type === "analytics") state.analytics.events = state.analytics.events.filter((event) => Number(event.timestamp || event.createdAt || Date.now()) >= cutoff);
+  if (type === "messages") state.messages = state.messages.filter((message) => Number(message.createdAt || Date.now()) >= cutoff);
+  if (type === "pos") {
+    Object.values(state.currentShift.tables).forEach((table) => {
+      table.posQueue = table.posQueue.filter((item) => !isDeliveredQueueStatus(item.queueStatus) || Number(item.updatedAt || Date.now()) >= cutoff);
+    });
+  }
+  if (type === "shifts") {
+    state.currentShift.shiftSummaries = (state.currentShift.shiftSummaries || []).filter((summary) => Number(summary.clockOutAt || summary.createdAt || Date.now()) >= cutoff);
+    if (state.storage.idbAvailable) await idbClear("shiftSummaries");
+  }
+  saveAll(true);
+  renderAll();
+  toast("Storage cleanup complete.");
+}
+
+function compactStorage() {
+  ["tableflow.backup", "tableflow.restaurantData.local", "tableflow.menuConfig", "tableflow.layoutConfig", "tableflow.analytics", "tableflow.messages"].forEach((key) => localStorage.removeItem(key));
+  saveAll(true);
+  renderAll();
+  toast("Storage compacted.");
 }
 
 function updateStorageStatus() {
@@ -3652,14 +4453,21 @@ function applyBranding() {
     document.documentElement.style.setProperty(name, value);
     document.body.style.setProperty(name, value);
   });
+  document.documentElement.style.setProperty("--glass-bg", b.preset === "iosGlass" ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.08)");
+  document.documentElement.style.setProperty("--glass-border", b.preset === "iosGlass" ? "rgba(255,255,255,.28)" : "var(--line)");
+  document.documentElement.style.setProperty("--glass-blur", b.preset === "iosGlass" ? "22px" : "10px");
+  document.documentElement.style.setProperty("--glass-shadow", b.preset === "iosGlass" ? "0 22px 70px rgba(0,0,0,.24)" : "0 14px 36px rgba(0,0,0,.28)");
+  document.body.classList.toggle("theme-ios-glass", b.preset === "iosGlass");
   document.body.classList.toggle("button-square", b.buttonStyle === "square");
   document.body.classList.toggle("button-pill", b.buttonStyle === "pill");
-  const logoHtml = b.logoDataUrl ? `<img src="${b.logoDataUrl}" alt="" />` : "TF";
+  const logoSrc = b.logoDataUrl || b.logoAssetPath || "";
+  const logoHtml = logoSrc ? `<img src="${logoSrc}" alt="" />` : "TF";
   if (els.shellBrandLogo) els.shellBrandLogo.innerHTML = logoHtml;
+  if (els.loadingBrandLogo) els.loadingBrandLogo.innerHTML = logoHtml;
   if (els.shellAppName) els.shellAppName.textContent = b.appDisplayName || "TableFlow";
   if (els.shellRestaurantName) els.shellRestaurantName.textContent = [b.restaurantName, b.storeNumber ? `Store ${b.storeNumber}` : ""].filter(Boolean).join(" - ") || "Local Server Assistant";
   if (els.authAppName) els.authAppName.textContent = b.appDisplayName || "TableFlow";
-  if (els.authBrandLogo) els.authBrandLogo.innerHTML = b.useLogoOnLogin && b.logoDataUrl ? `<img src="${b.logoDataUrl}" alt="" />` : `<div class="brand-icon">TF</div>`;
+  if (els.authBrandLogo) els.authBrandLogo.innerHTML = b.useLogoOnLogin && logoSrc ? `<img src="${logoSrc}" alt="" />` : `<div class="brand-icon">TF</div>`;
 }
 
 function renderThemePresets() {
@@ -3770,7 +4578,7 @@ function runDevAction(action) {
 
 function executeDevAction(action) {
   if (action === "demo-user") { state.profile.loggedIn = true; state.profile.name = "Demo Server"; return "Demo user ready"; }
-  if (action === "demo-restaurant") { state.settings.branding.restaurantName = "Demo Diner"; applyBranding(); return "Demo restaurant ready"; }
+  if (action === "demo-restaurant") { state.settings.branding.restaurantName = "Denny's Demo Store"; applyBranding(); return "Demo store ready"; }
   if (action === "reset-layout") { const defaults = createDefaults(); state.layoutConfig = defaults.layoutConfig; state.currentShift.tables = defaults.currentShift.tables; return "Layout reset"; }
   if (action === "random-table") { const table = randomTable(); seatParty(table.id, Math.min(table.seats || 4, 4)); return `${table.name} started`; }
   if (action === "random-drinks") return addRandomOrders("BEV", 4);
@@ -3844,7 +4652,7 @@ function applyThemePreset(key, rerender = true) {
 
 function saveBrandingFromSettings() {
   Object.assign(state.settings.branding, {
-    restaurantName: els.brandingRestaurantNameInput.value.trim() || "TableFlow Restaurant",
+    restaurantName: els.brandingRestaurantNameInput.value.trim() || "Denny's Store",
     storeNumber: els.brandingStoreNumberInput.value.trim(),
     appDisplayName: els.brandingAppNameInput.value.trim() || "TableFlow",
     primaryColor: els.brandingPrimaryInput.value,
@@ -3883,6 +4691,8 @@ function resizeLogo(dataUrl) {
     canvas.height = Math.max(1, Math.round(image.height * scale));
     canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
     state.settings.branding.logoDataUrl = canvas.toDataURL("image/png", 0.85);
+    state.settings.branding.logoKey = "store-logo";
+    if (state.storage.idbAvailable) idbPut("logoAssets", { id: "store-logo", dataUrl: state.settings.branding.logoDataUrl, updatedAt: Date.now() });
     markDirty();
     renderAll();
     toast("Logo saved locally.");
@@ -3893,11 +4703,11 @@ function resizeLogo(dataUrl) {
 
 // Profile and PIN
 function renderProfile() {
-  els.profileSummary.textContent = state.profile.loggedIn ? `${state.profile.name} - ${state.profile.role}` : "Not logged in";
+  els.profileSummary.textContent = state.profile.loggedIn || state.activeUser ? `${state.profile.name || state.activeUser?.name || state.activeUser?.fullName} - ${currentRole()}` : "Not logged in";
   const schedule = getWorkSchedule();
   const assignedIds = getProfileAssignedTableIds();
   const allTables = state.layoutConfig.objects.filter((object) => object.category === "table");
-  if (!state.profile.loggedIn) {
+  if (!state.profile.loggedIn && !state.activeUser) {
     els.profilePanel.innerHTML = `
       <div class="settings-card">
         <h4>Start Shift</h4>
@@ -3916,23 +4726,50 @@ function renderProfile() {
     document.getElementById("startShiftButton").addEventListener("click", startMockShift);
     return;
   }
-  const initials = getInitials(state.profile.name);
+  const displayName = state.profile.name || state.activeUser?.name || state.activeUser?.fullName || "Denny's Team Member";
+  const initials = getInitials(displayName);
+  const summaries = state.currentShift.shiftSummaries || [];
+  const currentAssigned = getCurrentAssignedTableIds();
+  const assignedTables = currentAssigned.map((id) => getTable(id)?.name).filter(Boolean);
   els.profilePanel.innerHTML = `
-    <div class="profile-card-local">
-      <div class="profile-avatar" style="background:${escapeHtml(state.profile.color)}">${escapeHtml(initials)}</div>
-      <h4>${escapeHtml(state.profile.name)}</h4>
-      <p>${escapeHtml(state.profile.role)} / Employee ${escapeHtml(state.profile.employeeId)}</p>
-      <p>Server rank: ${escapeHtml(state.profile.serverRank || "Server")}</p>
-      <p>Assigned station: ${escapeHtml(state.profile.station)}</p>
-      <p>My section: ${assignedIds.length ? assignedIds.map((id) => getTable(id)?.name).filter(Boolean).join(", ") : "No tables assigned yet"}</p>
-      <p>Shift start: ${new Date(state.profile.shiftStart).toLocaleString()}</p>
-      <p>Current shift: ${getActiveTables().length} active tables, ${getPosQueueRows().length} POS queue items, ${state.currentShift.alerts.filter((a) => a.status !== "done").length} alerts</p>
-      <details class="settings-card" open>
-        <summary>My Table Section</summary>
-        <p class="empty-soft">Pick the tables that are yours. Start Table will show these first, with a Show All Tables button when you need it.</p>
+    <div class="profile-layout">
+      <section class="profile-card employee-profile-card">
+        <div class="profile-avatar" style="background:${escapeHtml(state.profile.color || state.settings.branding.primaryColor || "#d71920")}">${escapeHtml(initials)}</div>
+        <div>
+          <h3>${escapeHtml(displayName)}</h3>
+          <p>${escapeHtml(currentRole())} - Employee ${escapeHtml(state.profile.employeeId || state.activeUser?.employeeId || "Unassigned")}</p>
+          <div class="chip-row">
+            <span class="status-chip ${isClockedIn() ? "success" : ""}">${isClockedIn() ? "Clocked In" : "Clocked Out"}</span>
+            <span class="status-chip">${escapeHtml(getStationName(state.currentShift.sectionId || getCurrentStationId()))}</span>
+            <span class="status-chip">${assignedTables.length} tables</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <h4>Quick Actions</h4>
+        <div class="quick-action-grid">
+          <button class="primary" id="profileClockButton" type="button">${isClockedIn() ? "Clock Out" : "Clock In"}</button>
+          <button id="profileEditButton" type="button">Edit Profile</button>
+          <button id="profileSummaryButton" type="button">View Shift Summary</button>
+          <button id="profileLockButton" type="button">Lock App</button>
+          <button class="danger" id="logoutButton" type="button">Sign Out</button>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <h4>Current Shift</h4>
+        <div class="action-row"><span>Status</span><strong>${isClockedIn() ? `Started ${new Date(state.currentShift.clockInAt || Date.now()).toLocaleTimeString()}` : "Not clocked in"}</strong></div>
+        <div class="action-row"><span>Active tables</span><strong>${getActiveTables().length}</strong></div>
+        <div class="action-row"><span>POS queue</span><strong>${getPosQueueRows().length}</strong></div>
+        <div class="action-row"><span>Alerts</span><strong>${getRoleAlerts().length}</strong></div>
+      </section>
+
+      <section class="section-card">
+        <h4>Assigned Tables</h4>
         <div class="section-table-grid">
           ${allTables.map((table) => `
-            <button class="${assignedIds.includes(table.id) ? "active" : ""}" data-profile-table="${table.id}" type="button">
+            <button class="${currentAssigned.includes(table.id) ? "active" : ""}" data-profile-table="${table.id}" type="button">
               <strong>${escapeHtml(table.name)}</strong>
               <span>${escapeHtml(getStationName(table.stationId))}</span>
             </button>
@@ -3943,9 +4780,10 @@ function renderProfile() {
           <button id="selectStationTablesButton" type="button">Use Current Station</button>
           <button id="clearSectionButton" type="button">Clear Section</button>
         </div>
-      </details>
-      <details class="settings-card" open>
-        <summary>Work Schedule</summary>
+      </section>
+
+      <section class="section-card">
+        <h4>Schedule</h4>
         <div class="form-grid">
           <label class="field"><span>Usual work days</span><input id="profileDaysInput" value="${escapeHtml((schedule.days || []).join(", "))}" /></label>
           <label class="field"><span>Shift start</span><input id="profileShiftStartInput" type="time" value="${escapeHtml(schedule.shiftStart || "09:00")}" /></label>
@@ -3957,13 +4795,33 @@ function renderProfile() {
           <label class="field wide"><span>Break times optional</span><input id="profileBreaksInput" value="${escapeHtml((schedule.breakTimes || []).join(", "))}" placeholder="Example: 02:00-02:15" /></label>
         </div>
         <button class="primary" id="saveScheduleButton" type="button">Save Schedule</button>
-      </details>
-      <div class="button-row">
-        <button id="profileSettingsButton" type="button">App Preferences</button>
-        <button id="logoutButton" type="button">Mock Logout</button>
-      </div>
+      </section>
+
+      <section class="section-card">
+        <h4>Recent Shift Summaries</h4>
+        ${summaries.length ? summaries.slice(0, 4).map((summary) => `<div class="action-row"><span>${new Date(summary.createdAt).toLocaleDateString()} - ${summary.tablesServed} tables</span><strong>$${Number(summary.tipsEarned || 0).toFixed(2)} tips</strong></div>`).join("") : `<div class="empty-state">No completed shift summaries yet.</div>`}
+      </section>
+
+      <section class="section-card">
+        <h4>Tips Summary</h4>
+        <div class="dashboard-stats">
+          <div class="stat-card"><p>Last tips</p><h3>$${Number(summaries[0]?.tipsEarned || 0).toFixed(2)}</h3></div>
+          <div class="stat-card"><p>Tips/hour</p><h3>$${Number(summaries[0]?.tipHourlyRate || 0).toFixed(2)}</h3></div>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <h4>Preferences</h4>
+        <div class="action-row"><span>Reminder style</span><strong>${escapeHtml(schedule.reminderStyle || "gentle")}</strong></div>
+        <div class="action-row"><span>Default section</span><strong>${escapeHtml(schedule.defaultStationId || "server-1")}</strong></div>
+        <button id="profileSettingsButton" type="button">Open Settings</button>
+      </section>
     </div>
   `;
+  document.getElementById("profileClockButton").addEventListener("click", () => isClockedIn() ? openClockOutFlow() : openClockInFlow());
+  document.getElementById("profileEditButton").addEventListener("click", () => toast("Edit Profile is ready through Schedule and Assigned Tables below."));
+  document.getElementById("profileSummaryButton").addEventListener("click", () => summaries.length ? showShiftSummary(summaries[0]) : toast("No shift summary yet."));
+  document.getElementById("profileLockButton").addEventListener("click", lockApp);
   document.getElementById("profileSettingsButton").addEventListener("click", () => setView("settings"));
   document.getElementById("saveScheduleButton").addEventListener("click", saveProfileSchedule);
   els.profilePanel.querySelectorAll("[data-profile-table]").forEach((button) => button.addEventListener("click", () => button.classList.toggle("active")));
@@ -3983,8 +4841,7 @@ function renderProfile() {
   });
   document.getElementById("logoutButton").addEventListener("click", () => showConfirm("Log out of this local shift profile?", "Logout", () => {
     state.profile.loggedIn = false;
-    saveAll(true);
-    setView("profile");
+    logoutLocal();
   }));
 }
 
@@ -4043,10 +4900,25 @@ function saveProfileSchedule() {
 
 function saveProfileSection() {
   state.profile.assignedTableIds = Array.from(els.profilePanel.querySelectorAll("[data-profile-table].active")).map((button) => button.dataset.profileTable);
+  state.currentShift.assignedTableIds = state.profile.assignedTableIds;
   logEvent("section_updated", null, null, null, { tableIds: state.profile.assignedTableIds });
   markDirty();
   renderAll();
   toast("My section saved.");
+}
+
+function showShiftSummary(summary) {
+  showModal(`
+    <h3>Shift Summary</h3>
+    <div class="dashboard-stats">
+      <div class="stat-card"><p>Tables</p><h3>${summary.tablesServed}</h3></div>
+      <div class="stat-card"><p>Guests</p><h3>${summary.guestsServed}</h3></div>
+      <div class="stat-card"><p>Tips/hour</p><h3>$${Number(summary.tipHourlyRate || 0).toFixed(2)}</h3></div>
+    </div>
+    <p>${escapeHtml(summary.notes || "No notes for this summary.")}</p>
+    <div class="modal-actions"><button class="primary" id="closeModalButton" type="button">Done</button></div>
+  `);
+  document.getElementById("closeModalButton").addEventListener("click", closeModal);
 }
 
 function setupPinKeypad() {
@@ -4063,6 +4935,35 @@ function showLockScreen() {
   els.lockScreen.classList.remove("hidden");
   els.pinEntryInput.value = "";
   els.lockMessage.textContent = "Enter PIN";
+}
+
+function lockApp() {
+  if (state.settings.pinEnabled && state.settings.pinHash) {
+    state.pinUnlocked = false;
+    showLockScreen();
+    return;
+  }
+  showModal(`
+    <h3>Create a Lock PIN</h3>
+    <p class="security-note">Use a 4 to 6 digit PIN to lock this device during service.</p>
+    <label class="field"><span>PIN</span><input id="lockPinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" /></label>
+    <label class="field"><span>Confirm PIN</span><input id="lockPinConfirmInput" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" /></label>
+    <div class="modal-actions"><button id="cancelLockPinButton" type="button">Cancel</button><button class="primary" id="saveLockPinButton" type="button">Save & Lock</button></div>
+  `);
+  document.getElementById("cancelLockPinButton").addEventListener("click", closeModal);
+  document.getElementById("saveLockPinButton").addEventListener("click", () => {
+    const pin = document.getElementById("lockPinInput").value;
+    const confirmPin = document.getElementById("lockPinConfirmInput").value;
+    if (!/^\d{4,6}$/.test(pin)) return toast("PIN must be 4 to 6 digits.", "danger");
+    if (pin !== confirmPin) return toast("PIN confirmation does not match.", "danger");
+    state.settings.pinHash = hashPin(pin);
+    state.settings.pinEnabled = true;
+    state.pinUnlocked = false;
+    saveAll(true);
+    closeModal();
+    showLockScreen();
+    toast("App locked.");
+  });
 }
 
 function unlockWithPin() {
@@ -4149,18 +5050,29 @@ function buildRestaurantData() {
   const existing = state.restaurantData || {};
   return {
     id: existing.id || makeId("restaurant"),
+    name: state.settings.branding?.restaurantName || state.layoutConfig.restaurantName || "Denny's Store",
     ownerUserId: state.activeUser?.id || existing.ownerUserId || "local-owner",
-    restaurantName: state.settings.branding?.restaurantName || state.layoutConfig.restaurantName || "TableFlow Restaurant",
+    restaurantName: state.settings.branding?.restaurantName || state.layoutConfig.restaurantName || "Denny's Store",
     storeNumber: state.settings.branding?.storeNumber || "",
-    logoDataUrl: state.settings.branding?.logoDataUrl || "",
-    theme: { ...(state.settings.branding || {}) },
-    settings: state.settings,
-    layouts: [state.layoutConfig],
-    menuConfig: state.menuConfig,
+    logoKey: state.settings.branding?.logoKey || (state.settings.branding?.logoDataUrl ? "store-logo" : ""),
+    settings: compactSettingsForLocalStorage(),
+    defaultConfigFiles: {
+      menu: "data/dennys-menu.csv",
+      layout: "data/dennys-layout-default.json",
+      sideWork: "data/dennys-sidework-default.json",
+      themePresets: "data/dennys-theme-presets.json",
+      prices: "data/dennys-prices-ma.csv"
+    },
+    layouts: [{ id: "dennys-default-layout", source: "data/dennys-layout-default.json", overridesStore: "layoutOverrides" }],
+    menuConfig: { id: "dennys-menu", source: "data/dennys-menu.csv", overridesStore: "menuOverrides", categories: POS_CATEGORIES },
     stations: state.layoutConfig.stations,
-    currentShift: state.currentShift,
-    messages: state.messages,
-    analyticsEvents: state.analytics.events,
+    currentShiftId: state.currentShift.id,
+    members: buildRestaurantMembers(),
+    permissions: buildDefaultPermissions(),
+    inviteCode: existing.inviteCode || generateInviteCode(),
+    joiningEnabled: existing.joiningEnabled !== false,
+    requireApproval: existing.requireApproval !== false,
+    syncState: state.currentShift.syncState,
     roles: buildRoleSummary(),
     createdAt: existing.createdAt || now,
     updatedAt: now,
@@ -4170,14 +5082,46 @@ function buildRestaurantData() {
 
 function restaurantDataToAppState(restaurantData, defaults) {
   return {
-    layoutConfig: restaurantData.layouts?.[0] || defaults.layoutConfig,
-    menuConfig: restaurantData.menuConfig || defaults.menuConfig,
+    layoutConfig: restaurantData.layouts?.[0]?.objects ? restaurantData.layouts[0] : defaults.layoutConfig,
+    menuConfig: restaurantData.menuConfig?.items ? restaurantData.menuConfig : defaults.menuConfig,
     settings: { ...defaults.settings, ...(restaurantData.settings || {}), branding: { ...defaults.settings.branding, ...(restaurantData.theme || {}), ...(restaurantData.settings?.branding || {}) } },
     currentShift: restaurantData.currentShift || defaults.currentShift,
     analytics: { events: Array.isArray(restaurantData.analyticsEvents) ? restaurantData.analyticsEvents : [] },
     profile: defaults.profile,
     messages: Array.isArray(restaurantData.messages) ? restaurantData.messages : defaults.messages
   };
+}
+
+function buildRestaurantMembers() {
+  return state.users.map((user) => ({
+    userId: user.id,
+    role: user.role || "Server",
+    section: user.section || state.profile.station || "Station 1",
+    joinedAt: user.joinedAt || user.createdAt || Date.now(),
+    permissions: permissionsForRole(user.role || "Server"),
+    activeShift: state.currentShift.userId === user.id ? state.currentShift.id : null,
+    deviceIds: [state.currentShift.syncState?.deviceId || "local-device"]
+  }));
+}
+
+function buildDefaultPermissions() {
+  return {
+    "General Manager": ["all"],
+    Manager: ["service", "alerts", "messages", "floor_setup", "menu_setup", "team"],
+    Supervisor: ["service", "alerts", "messages", "analytics"],
+    PIC: ["service", "alerts", "messages", "rotation"],
+    Server: ["service", "assigned_tables", "alerts", "messages", "sidework"],
+    Host: ["floor", "seating", "alerts", "messages"],
+    Dishwasher: ["sidework", "alerts", "messages"]
+  };
+}
+
+function permissionsForRole(role) {
+  return buildDefaultPermissions()[role] || buildDefaultPermissions().Server;
+}
+
+function generateInviteCode() {
+  return `TF-DENNYS-${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
 function exportAllData() {
@@ -4251,7 +5195,7 @@ function openTableContextMenu(event, object) {
   menu.style.left = `${Math.min(event.clientX || 20, window.innerWidth - 240)}px`;
   menu.style.top = `${Math.min(event.clientY || 20, window.innerHeight - 360)}px`;
   menu.innerHTML = `
-    <button data-context="seat" type="button">Seat Party</button>
+    <button data-context="seat" type="button">Seat Table</button>
     <button data-context="order" type="button">View Order</button>
     <button data-context="pos" type="button">Open POS Queue</button>
     <button data-context="status" type="button">Change Status</button>
@@ -4331,15 +5275,16 @@ function bindEvents() {
   els.openMenuButton.addEventListener("click", () => setView("menu"));
   els.sendDrinksButton.addEventListener("click", sendDrinkRound);
   els.guestCheckTopButton.addEventListener("click", () => state.selectedTableId && showGuestCheck(state.selectedTableId));
-  els.messagesTopButton.addEventListener("click", () => setView("messages"));
+  els.messagesTopButton?.addEventListener("click", () => setView("messages"));
   els.menuSearchInput.addEventListener("input", () => { state.menuSearch = els.menuSearchInput.value; renderMenu(); });
   els.menuSubcategoryFilter.addEventListener("change", () => { state.menuSubcategory = els.menuSubcategoryFilter.value; renderMenu(); });
   els.menuEditorSearchInput.addEventListener("input", () => { state.menuEditorSearch = els.menuEditorSearchInput.value; renderMenuEditor(); });
   els.menuEditorCategoryFilter.addEventListener("change", () => { state.menuEditorCategory = els.menuEditorCategoryFilter.value; renderMenuEditor(); });
   els.noDrinkButton.addEventListener("click", () => addMenuItemToSelectedSeat("no-drink"));
   els.copyPosQueueButton.addEventListener("click", () => copyText(buildPosText()));
-  els.alertsButton.addEventListener("click", () => setView("stations"));
+  els.alertsButton.addEventListener("click", showAlertsDrawer);
   els.saveNowButton.addEventListener("click", () => { saveAll(true); toast("Saved."); });
+  els.lockAppButton?.addEventListener("click", lockApp);
   els.unlockButton.addEventListener("click", unlockWithPin);
   els.clearLocalDataButton.addEventListener("click", () => showConfirm("This will remove local TableFlow data from this device.", "Clear Local Data", clearAllLocalData));
   bindSettingsEvents();
@@ -4405,7 +5350,7 @@ function bindSettingsEvents() {
   els.saveBrandingButton.addEventListener("click", saveBrandingFromSettings);
   els.uploadLogoButton.addEventListener("click", () => els.logoFileInput.click());
   els.logoFileInput.addEventListener("change", handleLogoUpload);
-  els.removeLogoButton.addEventListener("click", () => { state.settings.branding.logoDataUrl = ""; markDirty(); renderAll(); });
+  els.removeLogoButton.addEventListener("click", () => { state.settings.branding.logoDataUrl = ""; state.settings.branding.logoKey = ""; state.settings.branding.logoAssetPath = ""; markDirty(); renderAll(); });
   els.saveCustomThemeButton.addEventListener("click", () => { state.settings.branding.preset = "custom"; markDirty(); renderAll(); toast("Custom theme saved."); });
   els.resetThemeButton.addEventListener("click", () => applyThemePreset("default"));
   els.exportRestaurantButton.addEventListener("click", () => runAdminAction(() => downloadJson("tableflow-restaurant-data.json", buildRestaurantData())));
@@ -4477,7 +5422,7 @@ function renderGeneralManager() {
   }
   els.gmPanel.innerHTML = `
     <div class="gm-grid">
-      ${renderGmTool("Restaurant Settings", "Store identity, local workspace data, and role setup.", "settings", "Open Settings")}
+      ${renderGmTool("Store Settings", "Store identity, local workspace data, and role setup.", "settings", "Open Settings")}
       ${renderGmTool("Floor Editor", "Edit tables, stations, cashier spots, and labels.", "flooreditor", "Edit Floor")}
       ${renderGmTool("Menu Editor", "Edit menu items, POS keys, modifiers, and CSV imports.", "menueditor", "Edit Menu")}
       ${renderGmTool("Branding & Theme", "Logo, colors, theme presets, and guest check branding.", "settings", "Open Branding")}
@@ -4485,6 +5430,20 @@ function renderGeneralManager() {
       ${renderGmTool("Import / Export", "Back up restaurant data, menu, layout, analytics, and branding.", "settings", "Open Data")}
       ${renderGmTool("Analytics", "View local event history and shift performance.", "analytics", "View Analytics")}
       ${renderGmTool("Developer Tools", "Device preview, simulations, stress tests, and debug report.", "developer", "Open Dev Tools")}
+      <section class="settings-card">
+        <h4>Store Team</h4>
+        <div class="action-row"><span>Invite code</span><strong>${escapeHtml(state.restaurantData?.inviteCode || generateInviteCode())}</strong></div>
+        <div class="button-row"><button id="regenerateInviteButton" type="button">Regenerate Invite Code</button><button id="toggleJoinButton" type="button">${state.restaurantData?.joiningEnabled === false ? "Enable Joining" : "Disable Joining"}</button></div>
+        <p class="security-note">Join requests stay local until cloud sync is connected.</p>
+      </section>
+      <section class="settings-card">
+        <h4>Kiosk Seating Rotation</h4>
+        ${renderKioskRotation()}
+      </section>
+      <section class="settings-card">
+        <h4>Team Activity Feed</h4>
+        ${(state.currentShift.activityFeed || []).slice(0, 8).map((item) => `<div class="action-row"><span>${escapeHtml(item.text)}</span><strong>${new Date(item.createdAt).toLocaleTimeString()}</strong></div>`).join("") || `<div class="empty-state">No team activity yet.</div>`}
+      </section>
       <section class="settings-card">
         <h4>User / Roles Management</h4>
         <p class="security-note">Local roles only. Cloud user management can replace this later.</p>
@@ -4506,6 +5465,22 @@ function renderGeneralManager() {
   `;
   els.gmPanel.querySelectorAll("[data-gm-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.gmView)));
   els.gmPanel.querySelectorAll("[data-user-role]").forEach((select) => select.addEventListener("change", () => updateUserRole(select.dataset.userRole, select.value)));
+  document.getElementById("regenerateInviteButton")?.addEventListener("click", () => { state.restaurantData = { ...buildRestaurantData(), inviteCode: generateInviteCode() }; saveAll(true); renderAll(); toast("Invite code regenerated."); });
+  document.getElementById("toggleJoinButton")?.addEventListener("click", () => { state.restaurantData = { ...buildRestaurantData(), joiningEnabled: state.restaurantData?.joiningEnabled === false }; saveAll(true); renderAll(); });
+}
+
+function renderKioskRotation() {
+  const servers = state.users.filter((user) => ["Server", "PIC", "Supervisor", "Manager", "General Manager"].includes(user.role || "Server"));
+  const records = state.currentShift.seatingRecords || [];
+  const last = records[0];
+  const next = servers.length ? servers[(Math.max(0, servers.findIndex((user) => user.id === last?.seatedForUserId)) + 1) % servers.length] : null;
+  return `
+    <div class="action-row"><span>Last seated server</span><strong>${escapeHtml(last?.seatedForName || "None")}</strong></div>
+    <div class="action-row"><span>Next up</span><strong>${escapeHtml(next?.name || next?.fullName || "Set roster")}</strong></div>
+    <div class="user-role-list">
+      ${records.slice(0, 5).map((record) => `<div class="action-row"><span>Table ${escapeHtml(getTable(record.tableId)?.number || getTable(record.tableId)?.name || record.tableId)} - Party of ${record.partySize}</span><strong>Sat for ${escapeHtml(record.seatedForName)} by ${escapeHtml(record.seatedByName)}</strong></div>`).join("") || `<div class="empty-state">No seating records yet.</div>`}
+    </div>
+  `;
 }
 
 function renderGmTool(title, description, view, buttonLabel) {
@@ -4603,6 +5578,148 @@ function buildRoleSummary() {
   return state.users.map((user) => ({ id: user.id, name: user.name, email: user.email, role: user.role || "Server", employeeId: user.employeeId || "" }));
 }
 
+function isClockedIn() {
+  return Boolean(state.currentShift?.isClockedIn && !state.currentShift.clockOutAt);
+}
+
+function getCurrentAssignedTableIds() {
+  return state.currentShift?.assignedTableIds?.length ? state.currentShift.assignedTableIds : getProfileAssignedTableIds();
+}
+
+function requireClockedIn(action) {
+  if (isClockedIn() || hasAnyRole(["General Manager", "Manager", "Supervisor", "PIC"])) {
+    action();
+    return;
+  }
+  openClockInFlow("Clock in before starting tables.");
+}
+
+function openClockInFlow(message = "") {
+  const tables = state.layoutConfig.objects.filter((object) => object.category === "table");
+  const selected = new Set(getCurrentAssignedTableIds());
+  const sectionId = state.currentShift.sectionId || getCurrentStationId();
+  showModal(`
+    <div class="flow-header">
+      <div><h3>Clock In</h3><p>${escapeHtml(message || "Select your Denny's section and tables for this shift.")}</p></div>
+      <button id="closeModalButton" type="button">Cancel</button>
+    </div>
+    <div class="form-grid">
+      <label class="field"><span>Role</span><select id="clockRoleInput">${getRoleOptions(currentRole())}</select></label>
+      <label class="field"><span>Section</span><select id="clockSectionInput">${state.layoutConfig.stations.filter((station) => station.type === "server").map((station) => `<option value="${station.id}" ${station.id === sectionId ? "selected" : ""}>${escapeHtml(station.name)}</option>`).join("")}</select></label>
+      <label class="field wide"><span>Starting notes optional</span><input id="clockNotesInput" placeholder="Example: closing section, patio closed, training server" /></label>
+    </div>
+    <div class="button-row"><button id="clockSelectSectionButton" type="button">Select All In Section</button><button id="clockClearTablesButton" type="button">Clear Selection</button></div>
+    <div class="section-table-grid">
+      ${tables.map((table) => `<button class="${selected.has(table.id) ? "active" : ""}" data-clock-table="${table.id}" type="button"><strong>${escapeHtml(table.name)}</strong><span>${escapeHtml(getStationName(table.stationId))}</span></button>`).join("")}
+    </div>
+    <div class="modal-actions"><button class="primary" id="confirmClockInButton" type="button">Confirm Shift Start</button></div>
+  `);
+  const refreshSectionSelection = () => {
+    const stationId = document.getElementById("clockSectionInput").value;
+    document.querySelectorAll("[data-clock-table]").forEach((button) => {
+      button.classList.toggle("active", getTable(button.dataset.clockTable)?.stationId === stationId);
+    });
+  };
+  document.getElementById("clockSelectSectionButton").addEventListener("click", refreshSectionSelection);
+  document.getElementById("clockClearTablesButton").addEventListener("click", () => document.querySelectorAll("[data-clock-table]").forEach((button) => button.classList.remove("active")));
+  document.querySelectorAll("[data-clock-table]").forEach((button) => button.addEventListener("click", () => button.classList.toggle("active")));
+  document.getElementById("confirmClockInButton").addEventListener("click", confirmClockIn);
+  document.getElementById("closeModalButton").addEventListener("click", closeModal);
+}
+
+function confirmClockIn() {
+  const assignedTableIds = Array.from(document.querySelectorAll("[data-clock-table].active")).map((button) => button.dataset.clockTable);
+  state.currentShift.isClockedIn = true;
+  state.currentShift.clockInAt = Date.now();
+  state.currentShift.clockOutAt = null;
+  state.currentShift.userId = state.activeUser?.id || "local-user";
+  state.currentShift.restaurantId = state.restaurantData?.id || "local-store";
+  state.currentShift.role = document.getElementById("clockRoleInput").value;
+  state.currentShift.sectionId = document.getElementById("clockSectionInput").value;
+  state.currentShift.assignedTableIds = assignedTableIds;
+  state.currentShift.notes = document.getElementById("clockNotesInput").value.trim();
+  state.profile.loggedIn = true;
+  state.profile.role = state.currentShift.role;
+  state.profile.assignedTableIds = assignedTableIds;
+  state.profile.shiftStart = state.currentShift.clockInAt;
+  closeModal();
+  logEvent("clock_in", null, null, null, { assignedTableIds, sectionId: state.currentShift.sectionId });
+  saveAll(true);
+  renderAll();
+  toast("Clocked in.");
+}
+
+function openClockOutFlow() {
+  const now = Date.now();
+  const clockIn = state.currentShift.clockInAt || state.profile.shiftStart || now;
+  const hours = Math.max(0.01, (now - clockIn) / 3600000);
+  showModal(`
+    <div class="flow-header"><div><h3>Clock Out</h3><p>Review your shift summary before ending service.</p></div><button id="closeModalButton" type="button">Cancel</button></div>
+    <div class="dashboard-stats">
+      <div class="stat-card"><p>Shift Length</p><h3>${hours.toFixed(2)}h</h3></div>
+      <div class="stat-card"><p>Tables Served</p><h3>${getShiftTablesServed()}</h3></div>
+      <div class="stat-card"><p>Guests Served</p><h3>${getShiftGuestsServed()}</h3></div>
+    </div>
+    <div class="form-grid">
+      <label class="field"><span>Clock out time</span><input id="clockOutTimeInput" type="datetime-local" value="${toDateTimeLocal(now)}" /></label>
+      <label class="field"><span>Tips earned</span><input id="tipsEarnedInput" type="number" min="0" step="0.01" /></label>
+      <label class="field wide"><span>Notes</span><textarea id="clockOutNotesInput" rows="3"></textarea></label>
+    </div>
+    <div class="modal-actions"><button class="primary" id="confirmClockOutButton" type="button">Confirm Clock Out</button></div>
+  `);
+  document.getElementById("confirmClockOutButton").addEventListener("click", confirmClockOut);
+  document.getElementById("closeModalButton").addEventListener("click", closeModal);
+}
+
+function confirmClockOut() {
+  const adjusted = new Date(document.getElementById("clockOutTimeInput").value).getTime() || Date.now();
+  const clockIn = state.currentShift.clockInAt || adjusted;
+  const tips = Number(document.getElementById("tipsEarnedInput").value) || 0;
+  const hours = Math.max(0.01, (adjusted - clockIn) / 3600000);
+  const summary = {
+    id: makeId("shiftSummary"),
+    userId: state.currentShift.userId || state.activeUser?.id || "local-user",
+    restaurantId: state.currentShift.restaurantId || state.restaurantData?.id || "local-store",
+    clockInAt: clockIn,
+    clockOutAt: Date.now(),
+    adjustedClockOutAt: adjusted,
+    assignedTableIds: state.currentShift.assignedTableIds || [],
+    tipsEarned: tips,
+    tipHourlyRate: Number((tips / hours).toFixed(2)),
+    tablesServed: getShiftTablesServed(),
+    guestsServed: getShiftGuestsServed(),
+    ordersRungIn: getPosQueueRows().length,
+    checkBacksCompleted: state.analytics.events.filter((event) => event.type === "check_back_completed").length,
+    sideWorkCompleted: getSideWorkRows().filter((row) => row.instance.status === "Done").length,
+    notes: document.getElementById("clockOutNotesInput").value.trim(),
+    createdAt: Date.now()
+  };
+  state.currentShift.shiftSummaries.unshift(summary);
+  if (state.storage.idbAvailable) idbPut("shiftSummaries", summary);
+  state.currentShift.isClockedIn = false;
+  state.currentShift.clockOutAt = adjusted;
+  state.currentShift.tipsEarned = tips;
+  closeModal();
+  logEvent("clock_out", null, null, null, summary);
+  saveAll(true);
+  renderAll();
+  toast(`Clocked out. Tips/hour: $${summary.tipHourlyRate.toFixed(2)}`);
+}
+
+function getShiftTablesServed() {
+  return Object.values(state.currentShift.tables || {}).filter((table) => table.partySize || table.timestamps?.seated).length;
+}
+
+function getShiftGuestsServed() {
+  return Object.values(state.currentShift.tables || {}).reduce((sum, table) => sum + Number(table.partySize || table.maxPartySize || 0), 0);
+}
+
+function toDateTimeLocal(time) {
+  const date = new Date(time);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 // Service actions
 function quickSeatSelected() {
   openStartTableFlow();
@@ -4610,11 +5727,44 @@ function quickSeatSelected() {
 
 function seatParty(tableId, partySize, options = {}) {
   const tableState = getTableState(tableId);
+  const now = Date.now();
+  const table = getTable(tableId);
+  const ownerUserId = state.currentShift.userId || state.activeUser?.id || "local-user";
+  const ownerName = state.profile.name || state.activeUser?.name || state.activeUser?.fullName || "Server";
   tableState.partySize = partySize;
+  tableState.updatedAt = now;
+  tableState.maxPartySize = Math.max(Number(tableState.maxPartySize || 0), Number(partySize || 0));
   tableState.selectedSeat = partySize ? 1 : null;
-  tableState.timestamps.seated = tableState.timestamps.seated || Date.now();
+  tableState.timestamps.seated = tableState.timestamps.seated || now;
+  tableState.seatedAt = tableState.timestamps.seated;
+  tableState.ownerUserId = ownerUserId;
+  tableState.ownerName = ownerName;
+  tableState.sectionId = state.currentShift.sectionId || table?.stationId || getCurrentStationId();
+  tableState.seats = Array.from({ length: Math.max(1, Number(partySize || 1)) }, (_, index) => ({
+    id: `${tableId}-seat-${index + 1}`,
+    seatNumber: index + 1,
+    status: "Seated",
+    createdAt: now
+  }));
+  state.selectedTableId = tableId;
+  state.currentShift.activeTableId = tableId;
+  const seatingRecord = {
+    id: makeId("seating"),
+    tableId,
+    partySize,
+    seatedForUserId: ownerUserId,
+    seatedForName: ownerName,
+    seatedByUserId: state.activeUser?.id || "local-device",
+    seatedByName: state.activeUser?.name || state.activeUser?.fullName || "TableFlow",
+    seatedAt: now
+  };
+  state.currentShift.seatingRecords.unshift(seatingRecord);
+  state.currentShift.activityFeed.unshift({ id: makeId("activity"), type: "table_seated", text: `${seatingRecord.seatedByName} sat ${table?.name || tableId} for ${ownerName}`, createdAt: now });
   setTableStatus(tableId, partySize ? "Seated" : "Open", false);
-  logEvent("table_seated", tableId, null, null, { partySize });
+  logEvent("table_seated", tableId, null, null, { partySize, ownerUserId });
+  if (seatingRecord.seatedByUserId !== seatingRecord.seatedForUserId) {
+    createSystemAlert({ type: "table_sat_for_you", tableId, message: `Party of ${partySize} sat for you by ${seatingRecord.seatedByName} at ${table?.name || "a table"}.` });
+  }
   markDirty();
   if (partySize > 0 && !options.goToDashboard) {
     state.activeMenuCategory = "BEV";
@@ -4641,9 +5791,11 @@ function sendDrinkRound() {
 
 function setTableStatus(tableId, status, rerender = true) {
   const tableState = getTableState(tableId);
+  const now = Date.now();
   tableState.status = status;
+  tableState.updatedAt = now;
   const key = status.toLowerCase().replaceAll(" ", "_").replace("-", "_");
-  tableState.timestamps[key] = Date.now();
+  tableState.timestamps[key] = now;
   const eventMap = {
     Seated: "table_seated",
     Greeted: "greeted",
@@ -4943,6 +6095,10 @@ function showTableSelectorModal(onSelect = null) {
 }
 
 function openStartTableFlow() {
+  if (!isClockedIn() && !hasAnyRole(["General Manager", "Manager", "Supervisor", "PIC"])) {
+    openClockInFlow("Clock in before starting tables.");
+    return;
+  }
   state.startFlow = { tableId: null, partySize: null, showAllTables: false };
   renderStartTablePicker();
 }
@@ -4986,8 +6142,10 @@ function renderStartTablePicker(message = "") {
       renderActiveTableChoice(tableId);
       return;
     }
-    state.startFlow.tableId = tableId;
-    renderPartySizePicker();
+    requireClockedIn(() => {
+      state.startFlow.tableId = tableId;
+      renderPartySizePicker();
+    });
   }));
 }
 
@@ -5263,6 +6421,6 @@ if ("serviceWorker" in navigator && ["http:", "https:"].includes(window.location
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js")
       .then(() => console.log("Service Worker Registered"))
-      .catch(err => console.log("SW Error", err));
+      .catch(() => {});
   });
 }

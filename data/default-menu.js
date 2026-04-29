@@ -168,7 +168,7 @@
         canBeTableShare: false,
         category: normalizeLocationCategory(item),
         sortOrder: Number(item.sortOrder) || index + 1
-      })).filter((item) => Number(item.price) > 0 && item.category !== "MODS")
+      })).filter((item) => (Number(item.price) > 0 || item.category === "BEV") && item.category !== "MODS")
     };
   }
 

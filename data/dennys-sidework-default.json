@@ -1,0 +1,7 @@
+{
+  "tasks": [
+    { "id": "task-roll-silverware", "title": "Roll silverware", "description": "Build a small batch between tables.", "stationId": "server-1", "stationName": "Station 1", "role": "Server", "timingType": "shift_middle", "timingOffsetMinutes": 0, "dueWindowMinutes": 45, "priority": "medium", "repeat": "once", "estimatedMinutes": 10, "required": true, "category": "Silverware" },
+    { "id": "task-restock-syrup", "title": "Check syrup caddies", "description": "Refill or swap syrup caddies before the next breakfast push.", "stationId": "server-1", "stationName": "Station 1", "role": "Server", "timingType": "pre_rush", "timingOffsetMinutes": 0, "dueWindowMinutes": 45, "priority": "medium", "repeat": "once", "estimatedMinutes": 6, "required": true, "category": "Denny's Side Work" },
+    { "id": "task-coffee-station", "title": "Reset coffee station", "description": "Coffee, sugars, creamers, mugs, and backup pots.", "stationId": "drink-station", "stationName": "Drink Station", "role": "Server", "timingType": "repeating", "timingOffsetMinutes": 90, "dueWindowMinutes": 30, "priority": "medium", "repeat": "repeating", "estimatedMinutes": 5, "required": true, "category": "Beverage Area" }
+  ]
+}
