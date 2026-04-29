@@ -50,9 +50,7 @@
                                         "4 Bacon Strips",
                                         "4 Sausage links",
                                         "4 Turkey Bacon Strips",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -98,10 +96,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -180,19 +175,7 @@
                                         "French Fries",
                                         "Seasoned Fries",
                                         "Seasonal Fruit",
-                                        "No Side",
-                                        "Coca-Cola®",
-                                        "Diet Coke®",
-                                        "Sprite®",
-                                        "Dr Pepper®",
-                                        "Barq\u0027s® Root Beer",
-                                        "Hi-C® Fruit Punch",
-                                        "Coca-Cola® Zero Sugar",
-                                        "Signature Diner Blend Coffee",
-                                        "Signature Diner Blend Coffee - Decaf",
-                                        "Minute Maid® Lemonade",
-                                        "Minute Maid® Apple Juice",
-                                        "Minute Maid® Orange Juice"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -228,19 +211,7 @@
                                         "French Fries",
                                         "Seasoned Fries",
                                         "Seasonal Fruit",
-                                        "No Side",
-                                        "Coca-Cola®",
-                                        "Diet Coke®",
-                                        "Sprite®",
-                                        "Dr Pepper®",
-                                        "Barq\u0027s® Root Beer",
-                                        "Hi-C® Fruit Punch",
-                                        "Coca-Cola® Zero Sugar",
-                                        "Signature Diner Blend Coffee",
-                                        "Signature Diner Blend Coffee - Decaf",
-                                        "Minute Maid® Lemonade",
-                                        "Minute Maid® Apple Juice",
-                                        "Minute Maid® Orange Juice"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -290,19 +261,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coca-Cola®",
-                                        "Diet Coke®",
-                                        "Sprite®",
-                                        "Dr Pepper®",
-                                        "Barq\u0027s® Root Beer",
-                                        "Hi-C® Fruit Punch",
-                                        "Coca-Cola® Zero Sugar",
-                                        "Signature Diner Blend Coffee",
-                                        "Signature Diner Blend Coffee - Decaf",
-                                        "Minute Maid® Lemonade",
-                                        "Minute Maid® Apple Juice",
-                                        "Minute Maid® Orange Juice"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -350,19 +309,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coca-Cola®",
-                                        "Diet Coke®",
-                                        "Sprite®",
-                                        "Dr Pepper®",
-                                        "Barq\u0027s® Root Beer",
-                                        "Hi-C® Fruit Punch",
-                                        "Coca-Cola® Zero Sugar",
-                                        "Signature Diner Blend Coffee",
-                                        "Signature Diner Blend Coffee - Decaf",
-                                        "Minute Maid® Lemonade",
-                                        "Minute Maid® Apple Juice",
-                                        "Minute Maid® Orange Juice"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -398,19 +345,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coca-Cola®",
-                                        "Diet Coke®",
-                                        "Sprite®",
-                                        "Dr Pepper®",
-                                        "Barq\u0027s® Root Beer",
-                                        "Hi-C® Fruit Punch",
-                                        "Coca-Cola® Zero Sugar",
-                                        "Signature Diner Blend Coffee",
-                                        "Signature Diner Blend Coffee - Decaf",
-                                        "Minute Maid® Lemonade",
-                                        "Minute Maid® Apple Juice",
-                                        "Minute Maid® Orange Juice"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -449,9 +384,7 @@
                                         "2 Bacon Strips + 2 Sausage Links",
                                         "4 Bacon Strips",
                                         "4 Sausage links",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -490,9 +423,7 @@
                                         "2 Bacon Strips + 2 Sausage Links",
                                         "4 Bacon Strips",
                                         "4 Sausage links",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -531,9 +462,7 @@
                                         "2 Bacon Strips + 2 Sausage Links",
                                         "4 Bacon Strips",
                                         "4 Sausage links",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -567,9 +496,7 @@
                                         "French Fries",
                                         "Seasoned Fries",
                                         "Fresh Seasonal Fruit",
-                                        "No Potato",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Potato"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -612,9 +539,7 @@
                                         "2 Bacon Strips + 2 Sausage Links",
                                         "4 Bacon Strips",
                                         "4 Sausage links",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -666,9 +591,7 @@
                                         "Seasoned Fries",
                                         "No Side",
                                         "White Toast",
-                                        "English Muffin",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "English Muffin"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -713,9 +636,7 @@
                                         "Hearty 9- Grain Pancakes Available 5am-10pm",
                                         "Cinnamon Roll Pancakes",
                                         "Choconana Pancakes",
-                                        "Double Berry Banana Pancakes",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Double Berry Banana Pancakes"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -769,9 +690,7 @@
                                         "English Muffin",
                                         "Buttermilk Biscuit",
                                         "Grilled Ham Slice",
-                                        "Fresh Seasonal Fruit",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Fresh Seasonal Fruit"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -808,9 +727,7 @@
                                         "English Muffin",
                                         "Grilled Ham Slice",
                                         "Fresh Seasonal Fruit",
-                                        "Buttermilk Biscuit",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Buttermilk Biscuit"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -855,9 +772,7 @@
                                         "4 Bacon Strips",
                                         "4 Sausage Links",
                                         "Hash Browns",
-                                        "Hash Browns with Cheese",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Hash Browns with Cheese"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -904,9 +819,7 @@
                                         "1 Bacon Strip + 1 Sausage Link",
                                         "Turkey Bacon Strips (2)",
                                         "Ham",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -957,9 +870,7 @@
                                         "No Meat",
                                         "Add 2 Bacon Strips",
                                         "Add 2 Turkey Bacon Strips",
-                                        "Add 2 Sausage Links",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Add 2 Sausage Links"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1010,9 +921,7 @@
                                         "No Meat",
                                         "Add 2 Bacon Strips",
                                         "Add 2 Turkey Bacon Strips",
-                                        "Add 2 Sausage Links",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Add 2 Sausage Links"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1063,9 +972,7 @@
                                         "No Meat",
                                         "Add 2 Bacon Strips",
                                         "Add 2 Turkey Bacon Strips",
-                                        "Add 2 Sausage Links",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Add 2 Sausage Links"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1116,9 +1023,7 @@
                                         "No Meat",
                                         "Add 2 Bacon Strips",
                                         "Add 2 Turkey Bacon Strips",
-                                        "Add 2 Sausage Links",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Add 2 Sausage Links"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1168,9 +1073,7 @@
                                         "1 Bacon Strip + 1 Sausage Link",
                                         "Turkey Bacon Strips (2)",
                                         "Ham",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1365,8 +1268,6 @@
                                         "Cinnamon Roll Pancakes",
                                         "Choconana Pancakes",
                                         "Double Berry Banana Pancakes",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice",
                                         "Stack of Buttermilk Pancakes",
                                         "2 Slices of French Toast"
                                     ],
@@ -1450,9 +1351,7 @@
                                         "Seasoned Fries",
                                         "No Side",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1489,9 +1388,7 @@
                                         "Seasoned Fries",
                                         "No Side",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1522,9 +1419,7 @@
                                         "Add Avocado",
                                         "Side of Queso",
                                         "Extra Side of Salsa",
-                                        "Side of Sour Cream",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Side of Sour Cream"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1582,9 +1477,7 @@
                                         "Choconana Pancakes",
                                         "Double Berry Banana Pancakes",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1633,9 +1526,7 @@
                                         "Extra Cheddar Cheese",
                                         "Jalapenos",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1684,8 +1575,6 @@
                                         "Extra Fire-Roasted Bell Peppers \u0026 Onions",
                                         "Extra Swiss Cheese",
                                         "Jalapenos",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice",
                                         "Stack of Buttermilk Pancakes",
                                         "2 Slices of French Toast"
                                     ],
@@ -1738,9 +1627,7 @@
                                         "Extra Swiss Cheese",
                                         "Jalapenos",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1791,9 +1678,7 @@
                                         "Extra Cheddar Cheese",
                                         "Jalapenos",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1845,9 +1730,7 @@
                                         "Extra Swiss Cheese",
                                         "Jalapenos",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -1905,9 +1788,7 @@
                                         "Choconana Pancakes",
                                         "Double Berry Banana Pancakes",
                                         "Stack of Buttermilk Pancakes",
-                                        "2 Slices of French Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "2 Slices of French Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2650,10 +2531,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2703,10 +2581,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2752,10 +2627,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2798,10 +2670,7 @@
                                         "Seasoned Fries",
                                         "Beer Battered Onion Rings",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2846,10 +2715,7 @@
                                         "Seasoned Fries",
                                         "Beer Battered Onion Rings",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2900,10 +2766,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2943,10 +2806,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -2981,10 +2841,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3020,10 +2877,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3063,10 +2917,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3370,10 +3221,7 @@
                                         "Fresh Seasonal Fruit",
                                         "Broccoli",
                                         "Oven-Baked Mac \u0027N Cheese",
-                                        "Cup of Soup",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Cup of Soup"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3419,10 +3267,7 @@
                                         "Fresh Seasonal Fruit",
                                         "Broccoli",
                                         "Oven-Baked Mac \u0027N Cheese",
-                                        "Cup of Soup",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Cup of Soup"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3468,10 +3313,7 @@
                                         "Fresh Seasonal Fruit",
                                         "Broccoli",
                                         "Oven-Baked Mac \u0027N Cheese",
-                                        "Cup of Soup",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Cup of Soup"
                                     ],
                       "requiresPrepStation":  true,
                       "prepCapability":  "sauces",
@@ -3510,10 +3352,7 @@
                                         "Fresh Seasonal Fruit",
                                         "Broccoli",
                                         "Oven-Baked Mac \u0027N Cheese",
-                                        "Cup of Soup",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Cup of Soup"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3542,10 +3381,7 @@
                       "price":  20.19,
                       "modifiers":  [
                                         "White Toast (2)",
-                                        "Flour Tortillas (2)",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Flour Tortillas (2)"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3586,9 +3422,7 @@
                                         "1 Bacon Strip + 1 Sausage Link",
                                         "Turkey Bacon Strips (2)",
                                         "Ham",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3631,10 +3465,7 @@
                                         "Beer Battered Onion Rings",
                                         "Red-Skinned Potatoes",
                                         "Fresh Seasonal Fruit",
-                                        "No Side",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "No Side"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3671,9 +3502,7 @@
                                         "Over Hard",
                                         "No Eggs",
                                         "White Toast",
-                                        "7-Grain Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "7-Grain Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3704,9 +3533,7 @@
                                         "Add Avocado",
                                         "Side of Queso",
                                         "Extra Side of Salsa",
-                                        "Side of Sour Cream",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Side of Sour Cream"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3738,9 +3565,7 @@
                                         "Hash Browns with Cheese",
                                         "White Toast",
                                         "English Muffin",
-                                        "7-Grain Toast",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "7-Grain Toast"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3787,9 +3612,7 @@
                                         "1 Bacon Strip + 1 Sausage Link",
                                         "Turkey Bacon Strips (2)",
                                         "Ham",
-                                        "No Meat",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "No Meat"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3834,9 +3657,7 @@
                                         "4 Bacon Strips",
                                         "4 Sausage Links",
                                         "Hash Browns",
-                                        "Hash Browns with Cheese",
-                                        "Signature Diner Blend Coffee",
-                                        "Minute Maid® Orange Juice"
+                                        "Hash Browns with Cheese"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3911,10 +3732,7 @@
                                         "French Fries",
                                         "Seasoned Fries",
                                         "Fresh Seasonal Fruit",
-                                        "Onion Rings",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Onion Rings"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3950,10 +3768,7 @@
                                         "Fresh Seasonal Fruit",
                                         "Beer Battered Onion Rings",
                                         "Sweet Corn",
-                                        "Broccoli",
-                                        "Coke®",
-                                        "Diet Coke®",
-                                        "Sprite®"
+                                        "Broccoli"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -3988,9 +3803,7 @@
                                         "8 Slices White Toast",
                                         "8 Sausage",
                                         "8 Bacon",
-                                        "4 Bacon/4 Sausage",
-                                        "4 Minute Maid Orange Juice",
-                                        "2 Signature Diner Blend Coffees \u0026 2 Minute Maid Orange Juice"
+                                        "4 Bacon/4 Sausage"
                                     ],
                       "requiresPrepStation":  false,
                       "prepCapability":  "",
@@ -5299,31 +5112,30 @@
                       "sortOrder":  136
                   },
                   {
-                      "id":  "dennys-7614-41153899-2-milk",
+                      "id":  "dennys-7614-41153899-water",
                       "restaurantId":  "dennys-7614",
                       "createdAt":  "2026-04-28T00:00:00.000Z",
                       "updatedAt":  "2026-04-28T00:00:00.000Z",
-                      "createdBy":  "official-public-menu-import",
+                      "createdBy":  "JC",
                       "source":  "dennys-public-location-menu",
                       "sourceLocationSlug":  "dennys-7614",
-                      "sourceProductId":  "41153899",
-                      "sourceChainProductId":  "440038",
-                      "posKey":  "DNYOPT 4223553",
-                      "name":  "2% Milk",
-                      "shortName":  "2% Milk",
+                      "sourceProductId":  "80000000",
+                      "sourceChainProductId":  "800000",
+                      "posKey":  "DNY WATER",
+                      "name":  "Water",
+                      "shortName":  "WTR",
                       "category":  "BEV",
-                      "subcategory":  "Milk Choice ",
-                      "price":  null,
+                      "subcategory":  "Drink ",
+                      "price":  0.00,
                       "modifiers":  [
                                         "No Ice",
                                         "Light Ice",
                                         "Extra Ice",
-                                        "Lemon",
-                                        "No Lemon"
+                                        "Lemon"
                                     ],
-                      "requiresPrepStation":  false,
+                      "requiresPrepStation":  true,
                       "prepCapability":  "",
-                      "prepStationId":  "",
+                      "prepStationId":  "s3",
                       "canBeTableShare":  false,
                       "requiresSeat":  true,
                       "active":  true,
@@ -5510,10 +5322,12 @@
     "categories":  [
                        "STARTER",
                        "BEV",
+                       "Favorites",
                        "APPT",
                        "SIDES",
-                       "SOUP/SAL",
+                       "SKILLETS",
                        "ENTREE",
+                       "Value Menu",
                        "BREAKFAST",
                        "SLAMS",
                        "OMELETTES",
@@ -5523,6 +5337,7 @@
                        "SANDWICHES",
                        "DINNERS",
                        "VEG/POT",
+                       "SOUP/SAL",
                        "DESSERT",
                        "KIDS",
                        "MODS"
