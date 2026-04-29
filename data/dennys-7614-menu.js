@@ -4543,7 +4543,7 @@
                                         "Dr Pepper®",
                                         "Barq\u0027s® Root Beer",
                                         "FUZE® Raspberry Tea",
-                                        "Hi-Ci",
+                                        "HiCi",
                                         "Coca-Cola® Zero Sugar",
                                         "Lemonade",
                                         "STRW Lemonade"
