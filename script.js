@@ -655,7 +655,8 @@ window.addEventListener("beforeunload", (event) => {
 });
 
 function createDefaults() {
-  const layoutConfig = {
+  // Use exported layout config if available, otherwise fall back to legacy inline config
+  const layoutConfig = window.TableFlowLayoutConfig?.layoutConfig || {
     restaurantName: "Denny's Store Default",
     objects: [
       obj("table-1", "Table 1", "table", 70, 60, 130, 82, "booth-4", 4, "server-1"),
