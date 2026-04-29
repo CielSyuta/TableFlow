@@ -45,9 +45,7 @@ const POS_STATUS_LABELS = {
 };
 const POS_CATEGORIES = window.TableFlowMenuConfig.categories;
 const GRID = 20;
-const DEV_OWNER_EMAIL = "irazfromu@gmail.com";
-const DEV_OWNER_PASSWORD = "0506";
-const DEV_OWNER_EMAIL = "gmtester";
+const DEV_OWNER_EMAIL = "admin@tableflow.com";
 const DEV_OWNER_PASSWORD = "1234";
 const SERVICE_NAV_VIEWS = ["home", "floor", "pos", "orders", "sidework", "messages", "settings", "profile"];
 const GM_ROLES = ["General Manager"];
