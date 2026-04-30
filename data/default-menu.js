@@ -3,7 +3,7 @@
 
 (function () {
   const categories = [
-    "STARTER", "BEV", "APPT", "SIDES", "SOUP/SAL", "ENTREE", "BREAKFAST", "SLAMS",
+    "FAVORITES", "VALUE MEALS", "STARTER", "BEV", "APPT", "SIDES", "SOUP/SAL", "ENTREE", "BREAKFAST", "SLAMS",
     "OMELETTES", "SKILLETS", "PANCAKES", "BURGERS", "SANDWICHES", "DINNERS",
     "VEG/POT", "DESSERT", "KIDS", "MODS"
   ];
@@ -130,6 +130,8 @@
   if (locationMenu) {
     categories.splice(0, categories.length, ...mergeCategoryList(locationMenu.categories));
     items.splice(0, items.length, ...locationMenu.items);
+    applyDennyMenuEnhancements(items, categories);
+    applyStructuredPOSMenu(items, categories);
     window.TableFlowMenuConfig = {
       ...locationMenu,
       version: locationMenu.version || "dennys-7614-public-menu",
@@ -139,6 +141,8 @@
     };
   } else {
     mergeLegacyMenu(window.TableFlowLegacyMenuConfig);
+    applyDennyMenuEnhancements(items, categories);
+    applyStructuredPOSMenu(items, categories);
     window.TableFlowMenuConfig = {
       version: "demo-menu-v3-combined",
       label: "Combined diner-style demo menu. Replace with your store's real POS keys.",
@@ -229,8 +233,213 @@
     const name = String(item.name || item.shortName || "").toLowerCase();
     const subcategory = String(item.subcategory || "").toLowerCase();
     const category = String(item.category || "").toUpperCase();
+    if (subcategory.includes("denny's deals") || subcategory.includes("value")) return "VALUE MEALS";
     if (name.includes("skillet") || /^skillets?$/.test(subcategory.trim())) return "SKILLETS";
     return category || "ENTREE";
+  }
+
+  function applyStructuredPOSMenu(menuItems, categoryList) {
+    const config = window.TableFlowStructuredPOSMenu;
+    if (!config?.items?.length) return;
+    config.rootCategories?.forEach((category) => {
+      if (category && !categoryList.includes(category)) categoryList.unshift(category);
+    });
+    config.items.forEach((posItem, index) => {
+      const modifierLabels = [
+        ...(posItem.modifiers || []),
+        ...labelsForGroups(posItem.requiredModifierGroups, config),
+        ...labelsForGroups(posItem.optionalModifierGroups, config)
+      ];
+      addStructuredItem(menuItems, {
+        id: `pos-${posItem.id}`,
+        posKey: posItem.posKey || posItem.name.toUpperCase().slice(0, 20),
+        name: posItem.name,
+        shortName: posItem.shortName || posItem.name,
+        category: posItem.category,
+        subcategory: posItem.subcategory,
+        price: posItem.price,
+        colorTag: posItem.colorTag || "",
+        isAvailable: posItem.isAvailable !== false,
+        kitchenCategory: posItem.kitchenCategory || posItem.category,
+        requiredModifierGroups: posItem.requiredModifierGroups || [],
+        optionalModifierGroups: posItem.optionalModifierGroups || [],
+        defaultSelections: posItem.defaultSelections || {},
+        aliases: posItem.aliases || [],
+        modifiers: modifierLabels,
+        sortOrder: 5000 + index
+      });
+    });
+  }
+
+  function addStructuredItem(menuItems, item) {
+    if (menuItems.some((entry) => entry.id === item.id)) return;
+    const fingerprint = `${normalizeWords(item.category)}|${normalizeWords(item.subcategory)}|${normalizeWords(item.name)}`;
+    if (menuItems.some((entry) => `${normalizeWords(entry.category)}|${normalizeWords(entry.subcategory)}|${normalizeWords(entry.name)}` === fingerprint)) return;
+    menuItems.push({
+      restaurantId: "dennys-7614",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      createdBy: "tableflow-structured-pos",
+      requiresSeat: true,
+      requiresPrepStation: false,
+      prepCapability: "",
+      prepStationId: "",
+      active: true,
+      orderable: true,
+      canBeTableShare: false,
+      sortOrder: menuItems.length + 1,
+      ...item
+    });
+  }
+
+  function labelsForGroups(groupIds = [], config) {
+    return groupIds.flatMap((groupId) => config.modifierGroups?.[groupId]?.options || []);
+  }
+
+  function applyDennyMenuEnhancements(menuItems, categoryList) {
+    ["FAVORITES", "VALUE MEALS", "SKILLETS", "BEV"].forEach((category) => {
+      if (!categoryList.includes(category)) categoryList.unshift(category);
+    });
+    addEnhancedItem(menuItems, {
+      id: "dennys-local-tap-water",
+      posKey: "TAP WATER",
+      name: "Tap Water",
+      shortName: "Tap Water",
+      category: "BEV",
+      subcategory: "Water",
+      price: 0,
+      modifiers: ["No Ice", "Light Ice", "Extra Ice", "Lemon", "No Lemon"]
+    });
+    addEnhancedItem(menuItems, {
+      id: "dennys-local-hi-c-fruit-punch",
+      posKey: "HI-C FRUIT PUNCH",
+      name: "Hi-C Fruit Punch",
+      shortName: "Hi-C",
+      category: "BEV",
+      subcategory: "Soft Drinks",
+      price: 3.49,
+      modifiers: ["No Ice", "Light Ice", "Extra Ice", "Lemon", "No Lemon"]
+    });
+    [
+      ["dennys-local-mozzarella-sticks-app", "MOZZ STICKS", "Mozzarella Sticks", "Mozz Sticks", 8.99, ["Marinara Sauce", "Ranch", "No Sauce"]],
+      ["dennys-local-boneless-wings-app", "BONELESS WINGS", "Boneless Wings", "Boneless Wings", 11.99, ["8ct Wings", "16ct Wings", "BBQ Sauce", "Buffalo Sauce", "Honey Mustard", "Ranch", "Blue Cheese", "No Sauce"]],
+      ["dennys-local-premium-chicken-tenders-app", "TENDERS APP", "Premium Chicken Tenders Appetizer", "Tenders App", 10.99, ["BBQ Sauce", "Buffalo Sauce", "Honey Mustard", "Ranch", "Blue Cheese", "No Sauce"]],
+      ["dennys-local-classic-sampler-app", "SAMPLER", "Classic Sampler", "Sampler", 13.99, ["Marinara Sauce", "Ranch", "BBQ Sauce", "Honey Mustard", "No Sauce"]],
+      ["dennys-local-onion-rings-app", "ONION RINGS APP", "Beer-Battered Onion Rings Appetizer", "Onion Rings App", 7.99, ["Ranch", "BBQ Sauce", "No Sauce"]]
+    ].forEach(([id, posKey, name, shortName, price, modifiers], index) => addEnhancedItem(menuItems, {
+      id,
+      posKey,
+      name,
+      shortName,
+      category: "APPT",
+      subcategory: "Starters",
+      price,
+      modifiers,
+      requiresPrepStation: true,
+      prepCapability: "sauces",
+      prepStationId: "sauce-station",
+      sortOrder: 2500 + index
+    }));
+    [
+      ["dennys-local-braised-beef-skillet", "BRAISED BEEF SKIL", "Braised Beef Skillet", "Braised Beef Skil", 15.99, ["Scrambled", "Sunny Side Up", "Over Easy", "Over Medium", "Over Hard", "No Eggs", "Extra Fire-Roasted Bell Peppers and Onions", "Add Mushrooms", "White Toast", "English Muffin", "7-Grain Toast"]],
+      ["dennys-local-cali-taco-skillet", "CALI TACO SKIL", "Cali Taco Skillet", "Cali Taco Skil", 14.99, ["Scrambled", "Sunny Side Up", "Over Easy", "Over Medium", "Over Hard", "No Eggs", "Add Avocado", "Extra Pico", "Extra Queso", "Flour Tortillas (2)"]],
+      ["dennys-local-hearty-breakfast-skillet", "HEARTY SKILLET", "Hearty Breakfast Skillet", "Hearty Skillet", 14.49, ["Scrambled", "Sunny Side Up", "Over Easy", "Over Medium", "Over Hard", "No Eggs", "Add Sausage", "Add Bacon Strips", "White Toast", "English Muffin", "7-Grain Toast"]],
+      ["dennys-local-ultimate-skillet", "ULTIMATE SKILLET", "Ultimate Skillet", "Ultimate Skillet", 15.49, ["Scrambled", "Sunny Side Up", "Over Easy", "Over Medium", "Over Hard", "No Eggs", "Add Mushrooms", "Extra Cheddar Cheese", "White Toast", "English Muffin", "7-Grain Toast"]],
+      ["dennys-local-meat-lovers-skillet", "MEAT LOVERS SKIL", "Meat Lover's Skillet", "Meat Lovers Skil", 15.49, ["Scrambled", "Sunny Side Up", "Over Easy", "Over Medium", "Over Hard", "No Eggs", "Bacon Strips (2)", "Sausage Links (2)", "Ham", "White Toast", "English Muffin", "7-Grain Toast"]],
+      ["dennys-local-bourbon-chicken-sizzlin-skillet", "BOURBON CHIX SKIL", "Bourbon Chicken Sizzlin' Skillet", "Bourbon Chix Skil", 15.99, ["Add Flour Tortillas (2)", "No Bourbon Glaze", "Bourbon Glaze on Side", "Extra Fire-Roasted Bell Peppers and Onions", "Add Mushrooms", "Broccoli", "Seasoned Red-Skinned Potatoes"]],
+      ["dennys-local-crazy-spicy-sizzlin-skillet", "CRAZY SPICY SKIL", "Crazy Spicy Sizzlin' Skillet", "Crazy Spicy Skil", 15.99, ["Scrambled", "Sunny Side Up", "Over Easy", "Over Medium", "Over Hard", "No Eggs", "No Jalapenos", "Extra Jalapenos", "No 5-Pepper Sauce", "5-Pepper Sauce on Side", "No Queso", "Add Flour Tortillas (2)"]]
+    ].forEach(([id, posKey, name, shortName, price, modifiers], index) => addEnhancedItem(menuItems, {
+      id,
+      posKey,
+      name,
+      shortName,
+      category: "SKILLETS",
+      subcategory: "Breakfast Skillets",
+      price,
+      modifiers,
+      sortOrder: 3000 + index
+    }));
+    enhanceBreakfastChoices(menuItems);
+    addFavoriteCopies(menuItems);
+  }
+
+  function enhanceBreakfastChoices(menuItems) {
+    const breakfastCategories = new Set(["BREAKFAST", "SLAMS", "PANCAKES", "OMELETTES", "SKILLETS", "VALUE MEALS"]);
+    menuItems.forEach((item) => {
+      if (!breakfastCategories.has(String(item.category || "").toUpperCase())) return;
+      const name = String(item.name || "").toLowerCase();
+      const additions = [
+        "2 Eggs",
+        "Scrambled",
+        "Scrambled with cheese",
+        "Egg Whites",
+        "Sunny Side Up",
+        "Over Easy",
+        "Over Medium",
+        "Over Hard",
+        "No Eggs",
+        "Hash Browns",
+        "Hash Browns with Cheese",
+        "Seasoned Red-Skinned Potatoes",
+        "Red Rustic Mashed Potatoes",
+        "Fresh Seasonal Fruit",
+        "No Side",
+        "2 Bacon Strips + 2 Sausage Links",
+        "4 Bacon Strips",
+        "4 Sausage Links",
+        "Turkey Bacon Strips (2)",
+        "Ham",
+        "No Meat",
+        "No Ham",
+        "Sub Ham for Bacon",
+        "Add Bacon Strips"
+      ];
+      if (name.includes("lumberjack")) additions.push("Keep Ham", "No Ham", "Sub Ham for 2 Bacon Strips", "Sub Ham for 2 Sausage Links", "Extra Ham");
+      item.modifiers = uniqueModifiers([...(item.modifiers || []), ...additions]);
+    });
+  }
+
+  function uniqueModifiers(list) {
+    return [...new Set(list.map((value) => String(value || "").trim()).filter(Boolean))];
+  }
+
+  function addEnhancedItem(menuItems, item) {
+    if (menuItems.some((entry) => entry.id === item.id || normalizeWords(entry.name) === normalizeWords(item.name))) return;
+    menuItems.push({
+      restaurantId: "dennys-7614",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      createdBy: "tableflow-menu-enhancement",
+      requiresSeat: true,
+      requiresPrepStation: false,
+      prepCapability: "",
+      prepStationId: "",
+      active: true,
+      orderable: true,
+      canBeTableShare: false,
+      sortOrder: menuItems.length + 1,
+      ...item
+    });
+  }
+
+  function addFavoriteCopies(menuItems) {
+    const favoriteNames = [
+      "Original Grand Slam", "Build Your Own Grand Slam", "Lumberjack Slam", "All-American Slam",
+      "Super Slam", "Grand Slamwich", "Moons Over My Hammy", "Santa Fe Skillet", "Slamburger",
+      "Premium Chicken Tenders Dinner", "Classic Burger with Fries"
+    ];
+    favoriteNames.forEach((name, index) => {
+      const source = menuItems.find((item) => normalizeWords(item.name).includes(normalizeWords(name)));
+      if (!source || menuItems.some((item) => item.id === `${source.id}-favorite`)) return;
+      menuItems.push({
+        ...source,
+        id: `${source.id}-favorite`,
+        category: "FAVORITES",
+        subcategory: "Popular Dishes - MA / US",
+        createdBy: "tableflow-favorites",
+        sortOrder: 100 + index
+      });
+    });
   }
 
   function prepStationForCapability(capability) {

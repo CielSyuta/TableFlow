@@ -171,7 +171,7 @@ function cacheElements() {
     "zoomOutButton", "resetZoomButton", "zoomInButton", "exportLayoutButton", "importLayoutButton",
     "layoutFileInput", "floorObjectPalette", "floorEditorCanvas", "floorEditorCanvasWrap",
     "floorPropertiesPanel", "floorEditorStatus", "selectedTableChip",
-    "menuSeatButtons", "expandedOrderPanel", "homePanel", "tableDashboardPanel", "startTableButton",
+    "menuSeatButtons", "expandedOrderPanel", "homePanel", "tableDashboardPanel",
     "mobileFloorList", "messagesPanel", "gmPanel", "mobileNavToggle", "mobileNavBackdrop", "mobileNavDrawer",
     "categoryTabs", "menuGrid", "noDrinkButton", "ordersList", "posQueueList",
     "copyPosQueueButton", "stationsList", "analyticsCards",
@@ -1011,7 +1011,14 @@ function normalizeMenuConfig(menuConfig) {
     requiresPrepStation: Boolean(item.requiresPrepStation),
     prepCapability: item.prepCapability || "",
     prepStationId: item.prepStationId || "",
-    modifiers: Array.isArray(item.modifiers) ? item.modifiers : String(item.modifiers || "").split("|").filter(Boolean),
+    modifiers: sanitizeMenuModifiers(Array.isArray(item.modifiers) ? item.modifiers : String(item.modifiers || "").split("|").filter(Boolean), item),
+    requiredModifierGroups: Array.isArray(item.requiredModifierGroups) ? item.requiredModifierGroups : [],
+    optionalModifierGroups: Array.isArray(item.optionalModifierGroups) ? item.optionalModifierGroups : [],
+    defaultSelections: item.defaultSelections && typeof item.defaultSelections === "object" ? item.defaultSelections : {},
+    kitchenCategory: item.kitchenCategory || item.category || "",
+    aliases: Array.isArray(item.aliases) ? item.aliases : [],
+    colorTag: item.colorTag || "",
+    isAvailable: item.isAvailable !== false,
     active: item.active !== false,
     orderable: item.orderable !== false && item.category !== "MODS",
     sortOrder: Number(item.sortOrder) || index + 1
@@ -1041,9 +1048,41 @@ function mergeMenuConfigs(defaultMenu, savedMenu) {
   };
 }
 
+const BREAD_OPTION_LABELS = [
+  "White Toast",
+  "Wheat Toast",
+  "Sourdough Toast",
+  "Rye Toast",
+  "7-Grain Toast",
+  "English Muffin",
+  "Gluten-Free English Muffin",
+  "Buttermilk Biscuit"
+];
+
+const STRUCTURED_MODIFIER_GROUPS = window.TableFlowStructuredPOSMenu?.modifierGroups || {};
+const STRUCTURED_ROOT_CATEGORIES = window.TableFlowStructuredPOSMenu?.rootCategories || [];
+
+function sanitizeMenuModifiers(modifiers, item = {}) {
+  const category = String(item.category || "").toUpperCase();
+  const isBeverage = category === "BEV" || String(item.category || "") === "Beverages";
+  const cleaned = getUniqueList(modifiers)
+    .map((modifier) => normalizeModifierLabel(modifier))
+    .filter((modifier) => modifier && (isBeverage || !isDrinkOption(modifier)));
+  if (!isBeverage && cleaned.some(isBreadOption)) cleaned.push(...BREAD_OPTION_LABELS);
+  return getUniqueList(cleaned);
+}
+
+function normalizeModifierLabel(modifier) {
+  return String(modifier || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+\|\s+/g, " | ")
+    .trim();
+}
+
 function mergeCategories(primary = [], secondary = []) {
   const preferredOrder = [
-    "STARTER", "BEV", "APPT", "SIDES", "SOUP/SAL", "ENTREE", "BREAKFAST", "SLAMS",
+    ...STRUCTURED_ROOT_CATEGORIES,
+    "FAVORITES", "VALUE MEALS", "STARTER", "BEV", "APPT", "SIDES", "SOUP/SAL", "ENTREE", "BREAKFAST", "SLAMS",
     "OMELETTES", "SKILLETS", "PANCAKES", "BURGERS", "SANDWICHES", "DINNERS",
     "VEG/POT", "DESSERT", "KIDS", "MODS"
   ];
@@ -1055,6 +1094,7 @@ function mergeCategories(primary = [], secondary = []) {
 }
 
 function normalizeMenuCategory(item, categories = POS_CATEGORIES) {
+  if (categories.includes(item.category)) return item.category;
   const current = String(item.category || "").toUpperCase();
   const subcategory = String(item.subcategory || "").toLowerCase();
   const name = String(item.name || item.shortName || "").toLowerCase();
@@ -1815,7 +1855,7 @@ function renderOrderLine(order) {
     <div class="order-line ${delivered ? "delivered" : ""} ${cancelled ? "cancelled" : ""}">
       <div class="order-line-main">
         <div>
-          <strong>${delivered ? "Done - " : ""}${escapeHtml(order.shortName)}</strong>
+          <strong>${delivered ? "Done - " : ""}${Number(order.quantity || 1) > 1 ? `${Number(order.quantity)}x ` : ""}${escapeHtml(order.shortName)}</strong>
           <small>${escapeHtml(order.category)} / <span class="status-chip mini ${delivered ? "delivered-chip" : ""}">${escapeHtml(getPosStatusLabel(order.status))}</span></small>
           <small>${order.modifiers.length ? escapeHtml(order.modifiers.join(", ")) : "No modifiers"}${order.notes ? ` - ${escapeHtml(order.notes)}` : ""}</small>
           ${order.deliveredAt ? `<small>Delivered ${new Date(order.deliveredAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>` : ""}
@@ -1835,11 +1875,12 @@ function renderOrderLine(order) {
 }
 
 function renderModifierEditor(order, item) {
+  const modifiers = sanitizeMenuModifiers(item.modifiers || [], item);
   return `
     <div class="inline-editor" data-order-editor="${order.id}">
       <strong>Modify ${escapeHtml(order.shortName)}</strong>
       <div class="modifier-pills">
-        ${(item.modifiers || []).map((modifier) => `
+        ${modifiers.map((modifier) => `
           <label><input type="checkbox" data-edit-mod="${escapeHtml(modifier)}" ${order.modifiers.includes(modifier) ? "checked" : ""} /> ${escapeHtml(modifier)}</label>
         `).join("") || "<span>No modifiers for this item.</span>"}
       </div>
@@ -2031,27 +2072,28 @@ function renderMenuItemBuilder(tableId) {
   if (!item) return `<div class="item-builder"><p>Item is no longer available.</p><button data-builder-cancel type="button">Back to Menu</button></div>`;
   const groups = getMenuBuilderGroups(item, builder);
   const selectedMods = getBuilderSelectedModifiers(builder, item);
-  const needsSideChoice = groups.some((group) => group.key === "side") && !builder.selected.side;
+  const missingRequired = groups.filter((group) => group.required && !isBuilderGroupComplete(group, builder));
   return `
     <div class="item-builder">
       <div class="builder-header">
         <button data-builder-cancel type="button">Back to Menu</button>
         <div>
           <h3>${escapeHtml(item.name)}</h3>
-          <p>Seat ${seatNumber} - ${escapeHtml(item.category)} ${formatPrice(item.price) ? `- ${formatPrice(item.price)}` : ""}</p>
+          <p>Seat ${seatNumber} - ${escapeHtml(item.category)} / ${escapeHtml(item.subcategory || "Menu")} ${formatPrice(item.price) ? `- ${formatPrice(item.price)}` : ""}</p>
         </div>
       </div>
+      ${missingRequired.length ? `<div class="builder-warning">Required: ${escapeHtml(missingRequired.map((group) => group.title).join(", "))}</div>` : ""}
       ${isAppCategory(item.category) ? `
         <section class="builder-section">
           <h4>Send As</h4>
           <div class="builder-option-grid compact">
-            ${["APP", "ENTREE"].map((course) => `<button class="${builder.course === course ? "active" : ""}" data-builder-course="${course}" type="button">${course === "APP" ? "App" : "Entree + Side"}</button>`).join("")}
+            ${["APP", "ENTREE"].map((course) => `<button class="${builder.course === course ? "active" : ""}" data-builder-course="${course}" type="button">${course === "APP" ? "Appetizer" : "Entree + Side"}</button>`).join("")}
           </div>
         </section>
       ` : ""}
       ${groups.map((group) => `
         <section class="builder-section">
-          <h4>${escapeHtml(group.title)}</h4>
+          <h4>${escapeHtml(group.title)} ${group.required ? `<span class="required-mark">Required</span>` : `<span class="optional-mark">Optional</span>`}</h4>
           <div class="builder-option-grid">
             ${group.options.map((option, index) => {
               const active = group.type === "multi"
@@ -2064,16 +2106,28 @@ function renderMenuItemBuilder(tableId) {
         </section>
       `).join("") || `<p class="empty-soft">No required choices. Add it straight to the selected seat.</p>`}
       <label class="field"><span>Notes</span><textarea id="builderNotesInput" rows="2" placeholder="Anything special?">${escapeHtml(builder.notes || "")}</textarea></label>
+      <div class="quantity-row">
+        <span>Quantity</span>
+        <button data-builder-qty="-1" type="button">-</button>
+        <strong>${Number(builder.quantity || 1)}</strong>
+        <button data-builder-qty="1" type="button">+</button>
+      </div>
       <div class="builder-review">
         <strong>Review</strong>
         <p>${selectedMods.length ? escapeHtml(selectedMods.join(", ")) : "No modifiers selected yet."}</p>
       </div>
       <div class="button-row">
         <button data-builder-cancel type="button">Cancel</button>
-        <button class="primary" id="builderAddToSeatButton" type="button" ${needsSideChoice ? "disabled" : ""}>${needsSideChoice ? "Pick a Side First" : "Add to Seat"}</button>
+        <button class="primary" id="builderAddToSeatButton" type="button" ${missingRequired.length ? "disabled" : ""}>${missingRequired.length ? "Finish Required Choices" : "Add to Seat"}</button>
       </div>
     </div>
   `;
+}
+
+function isBuilderGroupComplete(group, builder) {
+  if (group.type === "multi") return (builder.multi[group.key] || []).length > 0;
+  if (group.type === "text") return true;
+  return Boolean(builder.selected[group.key]);
 }
 
 function getBuilderSelectedModifiers(builder, item) {
@@ -2120,6 +2174,10 @@ function bindMenuItemBuilder(table) {
     builder.multi[key] = list.includes(option) ? list.filter((entry) => entry !== option) : [...list, option];
     renderTableDashboard();
   }));
+  els.tableDashboardPanel.querySelectorAll("[data-builder-qty]").forEach((button) => button.addEventListener("click", () => {
+    builder.quantity = Math.max(1, Math.min(20, Number(builder.quantity || 1) + Number(button.dataset.builderQty)));
+    renderTableDashboard();
+  }));
   document.getElementById("builderNotesInput")?.addEventListener("input", (event) => {
     builder.notes = event.target.value;
   });
@@ -2127,7 +2185,7 @@ function bindMenuItemBuilder(table) {
     const notes = document.getElementById("builderNotesInput")?.value.trim() || "";
     const modifiers = getBuilderSelectedModifiers(builder, item);
     const categoryOverride = isAppCategory(item.category) && builder.course === "ENTREE" ? "ENTREE" : item.category;
-    addConfiguredMenuItemToSelectedSeat(item.id, modifiers, notes, { categoryOverride });
+    addConfiguredMenuItemToSelectedSeat(item.id, modifiers, notes, { categoryOverride, quantity: builder.quantity || 1 });
   });
 }
 
@@ -2620,7 +2678,7 @@ function isDennyLocationMenuItem(item) {
   const restaurantId = String(item?.restaurantId || "");
   const id = String(item?.id || "");
   const createdBy = String(item?.createdBy || "");
-  return restaurantId === "dennys-7614" || id.startsWith("dennys-7614-") || createdBy === "official-public-menu-import";
+  return restaurantId === "dennys-7614" || id.startsWith("dennys-7614-") || id.startsWith("pos-") || createdBy === "official-public-menu-import" || createdBy === "tableflow-menu-enhancement" || createdBy === "tableflow-structured-pos";
 }
 
 function hasMenuPrice(item) {
@@ -2629,11 +2687,12 @@ function hasMenuPrice(item) {
 }
 
 function isServiceMenuItem(item) {
-  return Boolean(item && item.active !== false && item.orderable !== false && item.category !== "MODS" && isDennyLocationMenuItem(item) && (hasMenuPrice(item) || item.category === "BEV"));
+  const structured = STRUCTURED_ROOT_CATEGORIES.includes(item?.category);
+  return Boolean(item && item.active !== false && item.isAvailable !== false && item.orderable !== false && item.category !== "MODS" && isDennyLocationMenuItem(item) && (structured || hasMenuPrice(item) || item.category === "BEV" || item.category === "Beverages"));
 }
 
 function isAppCategory(category) {
-  return ["APPT", "STARTER"].includes(String(category || "").toUpperCase());
+  return ["APPT", "STARTER"].includes(String(category || "").toUpperCase()) || category === "Appetizers";
 }
 
 function getServiceMenuItems() {
@@ -2708,14 +2767,16 @@ function renderCategoryTabs() {
 function renderMenuGrid() {
   const query = (state.menuSearch || "").toLowerCase();
   const items = getServiceMenuItems().filter((item) => {
-    const haystack = [item.name, item.shortName, item.posKey, item.subcategory, item.modifiers?.join(" ")].join(" ").toLowerCase();
+    const haystack = [item.name, item.shortName, item.posKey, item.subcategory, item.aliases?.join(" "), item.modifiers?.join(" ")].join(" ").toLowerCase();
     return item.category === state.activeMenuCategory && (!state.menuSubcategory || item.subcategory === state.menuSubcategory) && (!query || haystack.includes(query));
   }).sort((a, b) => a.sortOrder - b.sortOrder);
   els.menuGrid.innerHTML = items.map((item) => `
     <button class="menu-item-card" data-menu-item="${item.id}" type="button">
       <strong>${escapeHtml(item.shortName)}</strong>
       <span>${escapeHtml(item.posKey)}</span>
+      <em>${escapeHtml(item.subcategory || item.kitchenCategory || "")}</em>
       ${formatPrice(item.price) ? `<small>${formatPrice(item.price)}</small>` : ""}
+      ${item.requiredModifierGroups?.length ? `<small class="required-hint">${item.requiredModifierGroups.length} required</small>` : ""}
       ${item.requiresPrepStation ? `<small>Prep: ${escapeHtml(item.prepCapability)}</small>` : ""}
     </button>
   `).join("") || `<div class="settings-card">No priced Holyoke Denny's items in this category. Import updated menu/prices if something is missing.</div>`;
@@ -2778,6 +2839,7 @@ function addConfiguredMenuItemToSelectedSeat(itemId, modifiers = [], notes = "",
   seatNumber = Math.max(1, seatNumber);
   tableState.selectedSeat = seatNumber;
   const category = options.categoryOverride || item.category;
+  const quantity = Math.max(1, Number(options.quantity || 1));
   const order = {
     id: makeId("order"),
     tableId: table.id,
@@ -2788,6 +2850,7 @@ function addConfiguredMenuItemToSelectedSeat(itemId, modifiers = [], notes = "",
     itemName: item.name,
     shortName: item.shortName,
     posKey: item.posKey,
+    quantity,
     modifiers,
     notes,
     status: "not_rung_in",
@@ -2802,7 +2865,7 @@ function addConfiguredMenuItemToSelectedSeat(itemId, modifiers = [], notes = "",
   state.menuBuilder = null;
   markDirty();
   renderAll();
-  toast(`${item.shortName} added to ${table.name} Seat ${order.seatNumber}`);
+  toast(`${quantity > 1 ? `${quantity}x ` : ""}${item.shortName} added to ${table.name} Seat ${order.seatNumber}`);
 }
 
 function shouldOpenMenuItemBuilder(item) {
@@ -2816,34 +2879,46 @@ function createMenuBuilderState(tableId, itemId) {
     tableId,
     itemId,
     course: isAppCategory(item?.category) ? "APP" : "",
-    selected: {},
+    selected: { ...(item?.defaultSelections || {}) },
     multi: {},
+    quantity: 1,
     notes: ""
   };
 }
 
 function getMenuBuilderGroups(item, builder = {}) {
-  const modifiers = getUniqueList(item.modifiers || []);
+  const structuredGroups = getStructuredBuilderGroups(item);
+  if (structuredGroups.length) {
+    return structuredGroups.map((group) => builderGroup(group.id, group.name, group.type, group.options || [], new Set(), group.required));
+  }
+  const modifiers = sanitizeMenuModifiers(item.modifiers || [], item);
   const used = new Set();
   const groups = [];
   const eggOptions = modifiers.filter(isEggOption);
-  const proteinOptions = modifiers.filter((option) => isProteinOption(option) && !isAddOnOption(option));
-  const sideOptions = modifiers.filter(isSideOption);
-  const drinkOptions = modifiers.filter(isDrinkOption);
+  const proteinOptions = modifiers.filter(isProteinOption);
+  const breadOptions = getBreadOptionsForItem(modifiers);
+  const sideOptions = modifiers.filter((option) => isSideOption(option) && !isBreadOption(option));
   if (eggOptions.length) groups.push(builderGroup("egg", "Egg Style", "single", eggOptions, used));
-  if (proteinOptions.length) groups.push(builderGroup("protein", "Protein", "single", proteinOptions, used));
+  if (proteinOptions.length) groups.push(builderGroup("protein", "Protein / Meat Choices", "multi", proteinOptions, used));
+  if (breadOptions.length) groups.push(builderGroup("bread", "Bread / Toast Choice", "single", breadOptions, used));
   if (sideOptions.length && (!isAppCategory(item.category) || builder.course === "ENTREE")) groups.push(builderGroup("side", "Side Choice", "single", sideOptions, used));
   if (isAppCategory(item.category) && builder.course === "ENTREE" && !sideOptions.length) groups.push(builderGroup("side", "Side Choice", "single", getDefaultPricedSideOptions(), used));
-  if (drinkOptions.length) groups.push(builderGroup("drink", "Drink", "single", drinkOptions, used));
   const addOns = modifiers.filter((option) => !used.has(option) && (isAddOnOption(option) || isSauceOption(option) || isDressingOption(option)));
   if (addOns.length) groups.push(builderGroup("addons", "Add Ons / Mods", "multi", addOns.slice(0, 18), used));
   return groups.filter((group) => group.options.length);
 }
 
-function builderGroup(key, title, type, options, used) {
+function getStructuredBuilderGroups(item) {
+  return [
+    ...(item.requiredModifierGroups || []).map((id) => ({ ...STRUCTURED_MODIFIER_GROUPS[id], required: true })),
+    ...(item.optionalModifierGroups || []).map((id) => ({ ...STRUCTURED_MODIFIER_GROUPS[id], required: false }))
+  ].filter((group) => group?.id);
+}
+
+function builderGroup(key, title, type, options, used, required = false) {
   const unique = getUniqueList(options);
-  unique.forEach((option) => used.add(option));
-  return { key, title, type, options: unique };
+  unique.forEach((option) => used?.add(option));
+  return { key, title, type, options: unique, required };
 }
 
 function getUniqueList(list) {
@@ -2857,7 +2932,7 @@ function isEggOption(option) {
 
 function isProteinOption(option) {
   const value = option.toLowerCase();
-  return /\b(bacon|sausage|ham|turkey bacon|no meat)\b/.test(value);
+  return /\b(bacon|sausage|ham|turkey bacon|no meat|meat)\b/.test(value);
 }
 
 function isSideOption(option) {
@@ -2865,9 +2940,20 @@ function isSideOption(option) {
   return /(hash brown|french fries|seasoned fries|red[- ]?skinned|potato|seasonal fruit|fresh seasonal fruit|no side|pancake|french toast|toast|english muffin|tortilla|onion ring|broccoli|whole grain rice|mac|corn|cup of soup|side salad)/.test(value);
 }
 
+function isBreadOption(option) {
+  const value = option.toLowerCase();
+  return /(toast|english muffin|biscuit|bagel|sourdough|rye|7-grain|7 grain|wheat|white bread|dinner bread|garlic bread)/.test(value);
+}
+
 function isDrinkOption(option) {
   const value = option.toLowerCase();
-  return /(coke|sprite|dr pepper|root beer|coffee|decaf|orange juice|apple juice|lemonade|fruit punch|tea|milk|water)/.test(value);
+  return /\b(coke|cola|sprite|dr pepper|barq|root beer|hi-c|coffee|decaf|orange juice|apple juice|juice|lemonade|fruit punch|tea|milk|water)\b/.test(value);
+}
+
+function getBreadOptionsForItem(modifiers) {
+  if (!modifiers.some(isBreadOption)) return [];
+  const explicit = modifiers.filter(isBreadOption);
+  return getUniqueList([...explicit, ...BREAD_OPTION_LABELS]).filter((option) => !/french toast/i.test(option));
 }
 
 function isAddOnOption(option) {
@@ -2951,7 +3037,7 @@ function isFoodQueueItem(item) {
 }
 
 function isMealCategory(category) {
-  return ["ENTREE", "BREAKFAST", "SLAMS", "OMELETTES", "SKILLETS", "PANCAKES", "BURGERS", "SANDWICHES", "DINNERS", "KIDS"].includes(category);
+  return ["ENTREE", "BREAKFAST", "SLAMS", "OMELETTES", "SKILLETS", "PANCAKES", "BURGERS", "SANDWICHES", "DINNERS", "KIDS"].includes(category) || ["Breakfast", "Lunch / Dinner", "Jr Menu", "Specials / Value", "Family Packs", "LTO / Seasonal"].includes(category);
 }
 
 function isDrinkItem(item) {
@@ -2960,7 +3046,7 @@ function isDrinkItem(item) {
   const category = String(item.category || menuItem?.category || "").toUpperCase();
   const subcategory = String(menuItem?.subcategory || item.subcategory || "").toLowerCase();
   const name = `${item.itemName || ""} ${item.shortName || ""} ${menuItem?.name || ""}`.toLowerCase();
-  return category === "BEV" || ["soft drinks", "coffee", "tea", "juice", "milkshakes", "specialty drinks", "water", "refills", "milk"].some((term) => subcategory.includes(term) || name.includes(term.slice(0, -1)));
+  return category === "BEV" || category === "BEVERAGES" || ["soft drinks", "coffee", "tea", "juice", "milkshakes", "specialty drinks", "water", "refills", "milk"].some((term) => subcategory.includes(term) || name.includes(term.slice(0, -1)));
 }
 
 function getDrinkOrders(tableId) {
@@ -3141,7 +3227,7 @@ function renderPosQueueCard(row) {
         <span class="pos-status-dot ${cssQueueStatus(row.queueStatus)}"></span>
         <div><h4>${escapeHtml(row.tableName)} <small>Seat ${row.seatNumber || 1}</small></h4><p>${escapeHtml(getTableState(row.tableId).status)}</p></div>
       </div>
-      <div class="pos-item-name">${escapeHtml(row.shortName || row.itemName || row.posKey)}</div>
+      <div class="pos-item-name">${Number(row.quantity || 1) > 1 ? `${Number(row.quantity)}x ` : ""}${escapeHtml(row.shortName || row.itemName || row.posKey)}</div>
       <div class="pos-meta-row"><span>${escapeHtml(row.category)}</span><strong>${escapeHtml(statusLabel)}</strong></div>
       ${row.modifiers.length ? `<p class="pos-mods">${escapeHtml(row.modifiers.join(", "))}</p>` : ""}
       <div class="pos-action-grid">
@@ -4225,7 +4311,7 @@ function renderSettingsSubpageBody(page) {
   if (page === "integrations") return `
     <section class="section-card cloud-sync-card">
       <h4>Online Store Sync</h4>
-      <p>Use a shared REST, Supabase Edge Function, Firebase endpoint, or future TableFlow cloud endpoint so two devices can share table status, active orders, POS queue, messages, alerts, and shift activity.</p>
+      <p>Use a shared REST, Supabase Edge Function, Firebase endpoint, or future TableFlow cloud endpoint so two devices can share table status, active orders, POS queue, messages, alerts, and shift activity. GitHub/static hosting can serve the app, but it cannot store live table changes by itself.</p>
       <div class="sync-status-row">
         <span class="status-chip ${state.settings.sync?.status === "online" ? "ok" : state.settings.sync?.status === "error" ? "danger" : ""}">${escapeHtml(state.settings.sync?.status || "offline")}</span>
         <span>${state.settings.sync?.lastPush ? `Last push ${formatClock(state.settings.sync.lastPush)}` : "Not pushed yet"}</span>
@@ -5272,7 +5358,6 @@ function bindEvents() {
   els.importLayoutButton.addEventListener("click", () => els.layoutFileInput.click());
   els.layoutFileInput.addEventListener("change", readFileInput(importFloorLayout));
   els.quickSeatButton.addEventListener("click", () => quickSeatSelected());
-  els.startTableButton.addEventListener("click", openStartTableFlow);
   els.openMenuButton.addEventListener("click", () => setView("menu"));
   els.sendDrinksButton.addEventListener("click", sendDrinkRound);
   els.guestCheckTopButton.addEventListener("click", () => state.selectedTableId && showGuestCheck(state.selectedTableId));

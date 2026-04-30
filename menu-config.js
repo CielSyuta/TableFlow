@@ -3,6 +3,8 @@
 
 window.TableFlowLegacyMenuConfig = {
   categories: [
+    "FAVORITES",
+    "VALUE MEALS",
     "APPT",
     "SOUP/SAL",
     "ENTREE",
@@ -30,10 +32,12 @@ window.TableFlowLegacyMenuConfig = {
     item("root-beer", "ROOT BEER", "Root Beer", "Root Beer", "BEV", "Soft Drinks", null, false, null, ["No ice"], 14),
     item("coke-zero", "COKE ZERO", "Coca-Cola Zero Sugar", "Coke Zero", "BEV", "Soft Drinks", null, false, null, ["No ice", "Light ice", "Extra ice", "Lemon", "No lemon"], 15),
     item("fuze-raspberry-tea", "FUZE RASP TEA", "FUZE Raspberry Tea", "Fuze Tea", "BEV", "Soft Drinks", null, false, null, ["No ice", "Light ice", "Extra ice", "Lemon"], 16),
+    item("hi-c-fruit-punch", "HI-C FRUIT PUNCH", "Hi-C Fruit Punch", "Hi-C", "BEV", "Soft Drinks", null, false, null, ["No ice", "Light ice", "Extra ice", "Lemon", "No lemon"], 17),
     item("lemonade", "LEMONADE", "Lemonade", "Lemonade", "BEV", "Lemonade", null, false, null, ["No ice", "Light ice", "Extra ice"], 17),
     item("strawberry-lemonade", "STRAW LEM", "Strawberry Lemonade", "Straw Lem", "BEV", "Lemonade", null, false, null, ["No ice", "Light ice", "Extra strawberry"], 18),
     item("iced-tea", "ICED TEA", "Iced Tea", "Iced Tea", "BEV", "Tea", null, false, null, ["Sweet", "Unsweet", "Lemon", "No ice"], 19),
     item("water", "WATER", "Water", "Water", "BEV", "Water", null, false, null, ["No ice", "Lemon"], 17),
+    item("tap-water", "TAP WATER", "Tap Water", "Tap Water", "BEV", "Water", null, false, null, ["No ice", "Light ice", "Extra ice", "Lemon", "No lemon"], 18),
     item("bottled-water", "DASANI", "Dasani Bottled Water", "Dasani", "BEV", "Water", null, false, null, [], 18),
     item("no-drink", "NO DRINK", "No Drink", "No Drink", "BEV", "Water", null, false, null, [], 19),
 
@@ -59,14 +63,15 @@ window.TableFlowLegacyMenuConfig = {
     item("premium-chicken-tenders-app", "TENDERS APP", "Premium Chicken Tenders Appetizer", "Tenders App", "APPT", "Starters", null, true, "sauces", ["Ranch", "BBQ", "Honey mustard", "Buffalo"], 103, true),
     item("loaded-bacon-cheddar-tots", "LOADED TOTS", "Loaded Bacon Cheddar Tots", "Loaded Tots", "APPT", "Starters", null, true, "sauces", ["Ranch", "Sour cream side", "No bacon"], 104, true),
     item("classic-sampler", "SAMPLER", "Classic Sampler", "Sampler", "APPT", "Starters", null, true, "sauces", ["Ranch", "BBQ", "Marinara", "Honey mustard"], 105, true),
+    item("onion-rings-app", "ONION RINGS APP", "Beer-Battered Onion Rings Appetizer", "Onion Rings App", "APPT", "Starters", null, true, "sauces", ["Ranch", "BBQ", "No sauce"], 106, true),
 
     // =========================
     // CLASSIC SLAMS / BREAKFAST
     // =========================
-    item("original-grand-slam", "ORG GRAND SLAM", "Original Grand Slam", "Grand Slam", "ENTREE", "Classic Slams", null, false, null, ["Eggs", "Bacon", "Sausage", "Ham", "Hash browns", "Toast"], 200),
-    item("build-your-own-grand-slam", "BYO GRAND SLAM", "Build Your Own Grand Slam", "BYO Slam", "ENTREE", "Classic Slams", null, false, null, ["Pancakes", "French toast", "Eggs", "Bacon", "Sausage", "Hash browns"], 201),
-    item("all-american-slam", "ALL AM SLAM", "All-American Slam", "All American", "ENTREE", "Classic Slams", null, false, null, ["Eggs", "Cheese eggs", "Bacon", "Sausage", "Hash browns", "Toast"], 202),
-    item("lumberjack-slam", "LUMBERJACK", "Lumberjack Slam", "Lumberjack", "ENTREE", "Classic Slams", null, false, null, ["Eggs", "Bacon", "Sausage", "Ham", "Hash browns", "Toast"], 203),
+    item("original-grand-slam", "ORG GRAND SLAM", "Original Grand Slam", "Grand Slam", "ENTREE", "Classic Slams", null, false, null, ["2 Eggs", "Bacon", "Sausage", "Ham", "Hash browns", "Seasoned Red-Skinned Potatoes", "Toast", "No Ham", "Sub Ham for Bacon"], 200),
+    item("build-your-own-grand-slam", "BYO GRAND SLAM", "Build Your Own Grand Slam", "BYO Slam", "ENTREE", "Classic Slams", null, false, null, ["2 Eggs", "Pancakes", "French toast", "Bacon", "Sausage", "Ham", "Hash browns", "Seasoned Red-Skinned Potatoes"], 201),
+    item("all-american-slam", "ALL AM SLAM", "All-American Slam", "All American", "ENTREE", "Classic Slams", null, false, null, ["2 Eggs", "Cheese eggs", "Bacon", "Sausage", "Ham", "Hash browns", "Seasoned Red-Skinned Potatoes", "Toast", "No Ham", "Sub Ham for Bacon"], 202),
+    item("lumberjack-slam", "LUMBERJACK", "Lumberjack Slam", "Lumberjack", "ENTREE", "Classic Slams", null, false, null, ["2 Eggs", "Bacon", "Sausage", "Ham", "Hash browns", "Seasoned Red-Skinned Potatoes", "Toast", "No Ham", "Sub Ham for 2 Bacon Strips", "Sub Ham for 2 Sausage Links", "Extra Ham"], 203),
     item("french-toast-slam", "FT SLAM", "French Toast Slam", "FT Slam", "ENTREE", "Classic Slams", null, false, null, ["Eggs", "Bacon", "Sausage", "No powdered sugar"], 204),
     item("fit-slam", "FIT SLAM", "Fit Slam", "Fit Slam", "ENTREE", "Fit Fare", null, false, null, ["Egg whites", "Turkey bacon", "Fruit", "No toast"], 205),
     item("super-slam", "SUPER SLAM", "Super Slam", "Super Slam", "ENTREE", "Classic Slams", null, false, null, ["Eggs", "Bacon", "Sausage", "Hash browns", "Pancakes"], 206),
@@ -102,6 +107,12 @@ window.TableFlowLegacyMenuConfig = {
     item("hearty-breakfast-skillet", "HEARTY SKIL", "Hearty Breakfast Skillet", "Hearty Skil", "ENTREE", "Skillets", null, false, null, ["Eggs", "No cheese", "No onions", "No peppers"], 355),
     item("supreme-sizzlin-skillet", "SUPREME SKIL", "Supreme Sizzlin' Skillet", "Supreme Skil", "ENTREE", "Skillets", null, false, null, ["Eggs", "No cheese", "No mushrooms", "No onions"], 356),
     item("vegetable-skillet", "VEG SKIL", "Vegetable Skillet", "Veg Skil", "ENTREE", "Skillets", null, false, null, ["Eggs", "No cheese", "No mushrooms", "No onions"], 357),
+    item("santa-fe-skillet", "SANTA FE SKIL", "Santa Fe Skillet", "Santa Fe Skil", "SKILLETS", "Breakfast Skillets", null, false, null, ["Eggs", "Add avocado", "Extra peppers and onions", "Flour tortillas"], 358),
+    item("braised-beef-skillet", "BRAISED BEEF SKIL", "Braised Beef Skillet", "Braised Beef", "SKILLETS", "Breakfast Skillets", null, false, null, ["Eggs", "Add mushrooms", "Extra peppers and onions", "Toast"], 359),
+    item("cali-taco-skillet", "CALI TACO SKIL", "Cali Taco Skillet", "Cali Taco", "SKILLETS", "Breakfast Skillets", null, false, null, ["Eggs", "Add avocado", "Extra pico", "Flour tortillas"], 360),
+    item("meat-lovers-skillet", "MEAT LOVERS SKIL", "Meat Lover's Skillet", "Meat Lovers", "SKILLETS", "Breakfast Skillets", null, false, null, ["Eggs", "Bacon", "Sausage", "Ham", "Toast"], 361),
+    item("bourbon-chicken-sizzlin-skillet", "BOURBON CHIX SKIL", "Bourbon Chicken Sizzlin' Skillet", "Bourbon Chix", "SKILLETS", "Dinner Skillets", null, false, null, ["Add flour tortillas", "No bourbon glaze", "Bourbon glaze side", "Extra peppers and onions", "Add mushrooms"], 362),
+    item("crazy-spicy-sizzlin-skillet", "CRAZY SPICY SKIL", "Crazy Spicy Sizzlin' Skillet", "Crazy Spicy", "SKILLETS", "Dinner Skillets", null, false, null, ["Eggs", "No jalapenos", "Extra jalapenos", "No 5-pepper sauce", "Sauce side", "No queso", "Add flour tortillas"], 363),
 
     // =========================
     // BURGERS
